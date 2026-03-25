@@ -1,0 +1,233 @@
+__pycache__/
+*.pyc
+artifacts/
+state/
+.pytest_cache/
+# ------------------------------
+# OS / file explorer junk
+# ------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ------------------------------
+# Editor / IDE
+# ------------------------------
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# ------------------------------
+# Logs
+# ------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------
+# Environment / secrets
+# ------------------------------
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Local-only config
+*.local
+
+# ------------------------------
+# Temporary / runtime / state
+# ------------------------------
+tmp/
+temp/
+.tmp/
+.cache/
+state/
+artifacts/
+
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.pyo
+
+# Python packaging / build
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+share/python-wheels/
+var/
+wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+
+# Python environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.pyre/
+.pytype/
+.dmypy.json
+dmypy.json
+
+# Coverage / test output
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
+*.cover
+*.py,cover
+
+# Jupyter
+.ipynb_checkpoints/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Local databases
+*.sqlite3
+*.db
+
+# ------------------------------
+# Django / Flask / FastAPI extras
+# ------------------------------
+instance/
+.webassets-cache
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# ------------------------------
+# Node / JavaScript / TypeScript
+# ------------------------------
+node_modules/
+
+# Package manager caches
+.npm/
+.pnpm-store/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Build outputs
+dist/
+build/
+out/
+lib/
+.esbuild/
+.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Framework caches / outputs
+.next/
+.nuxt/
+.svelte-kit/
+.turbo/
+.vercel/
+.netlify/
+
+# React / Vite / CRA
+vite.svg
+
+# Test coverage
+coverage/
+
+# ------------------------------
+# Bundlers / linters / tools
+# ------------------------------
+.eslintcache
+.stylelintcache
+.cache-loader/
+
+# ------------------------------
+# Storybook
+# ------------------------------
+storybook-static/
+
+# ------------------------------
+# Docs / static site generators
+# ------------------------------
+site/
+docs/_build/
+
+# ------------------------------
+# Docker / local containers
+# ------------------------------
+.docker/
+docker-data/
+
+# ------------------------------
+# Misc binaries / archives
+# ------------------------------
+*.7z
+*.gz
+*.zip
+*.tar
+*.tgz
+*.bz2
+*.rar
+
+# ------------------------------
+# Optional local version managers
+# ------------------------------
+.python-version
+.node-version
+
+# direnv
+.direnv/
+
+# pre-commit
+.pre-commit-cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+artifacts/
+state/
+.claude/
+.mcp.json
