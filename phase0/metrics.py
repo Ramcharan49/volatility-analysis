@@ -23,7 +23,7 @@ LEVEL_METRIC_KEYS = [
     "front_end_dominance",
 ]
 
-FLOW_BASE_METRICS = ["atm_iv_7d", "rr25_30d", "bf25_30d", "front_end_dominance"]
+FLOW_BASE_METRICS = ["atm_iv_7d", "atm_iv_30d", "rr25_30d", "bf25_30d", "front_end_dominance"]
 FLOW_WINDOWS = ["5m", "15m", "60m", "1d"]
 FLOW_WINDOW_MINUTES = {"5m": 5, "15m": 15, "60m": 60, "1d": None}
 

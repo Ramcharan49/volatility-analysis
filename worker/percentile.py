@@ -80,6 +80,29 @@ def compute_flow_percentiles(
     return result
 
 
+def compute_abs_flow_percentiles(
+    current_flows: Dict[str, Optional[float]],
+    flow_baselines: Dict[str, List[float]],
+) -> Dict[str, Optional[float]]:
+    """Percentile of |current_change| vs |historical_changes| for stress scoring.
+
+    Takes absolute values of both current and historical before ranking,
+    so a -3% move and +3% move produce the same percentile.
+    """
+    result: Dict[str, Optional[float]] = {}
+    for key, value in current_flows.items():
+        if value is None:
+            result[key] = None
+            continue
+        history = flow_baselines.get(key, [])
+        abs_history = [abs(v) for v in history if v is not None]
+        if len(abs_history) < MIN_DAYS_FOR_PERCENTILE:
+            result[key] = None
+            continue
+        result[key] = empirical_percentile(abs(value), abs_history)
+    return result
+
+
 # ── Composite scores ─────────────────────────────────────────────────
 
 def compute_state_score(percentiles: Dict[str, Optional[float]]) -> Optional[float]:

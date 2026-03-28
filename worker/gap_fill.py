@@ -155,6 +155,200 @@ def detect_gaps(
     return gaps
 
 
+# ── Historical universe reconstruction ────────────────────────────────
+
+def build_historical_universe(
+    provider,
+    gap_date: date,
+    settings,
+    rate_limiter: RateLimiter,
+) -> List[ProbeUniverseItem]:
+    """Build the instrument universe that was active on gap_date.
+
+    Merges:
+    1. Spot index (always available)
+    2. Current instruments still active that were also active on gap_date
+    3. Expired option contracts for expiries that overlapped gap_date
+    Futures from the current catalog that were active on gap_date.
+
+    DTE filtering is anchored to gap_date, not today.
+    """
+    from phase0.instruments import filter_nifty_derivatives
+    from phase0.providers.upstox.history import (
+        fetch_expired_option_contracts,
+        fetch_expired_expiries,
+        fetch_historical_candles,
+    )
+
+    max_dte = settings.max_dte_days
+    spot_key = settings.spot_instrument_key
+
+    # 1. Spot — always present
+    universe: List[ProbeUniverseItem] = [
+        ProbeUniverseItem(
+            role="spot",
+            exchange="NSE",
+            tradingsymbol="Nifty 50",
+            instrument_key=spot_key,
+            provider="upstox",
+        )
+    ]
+
+    # 2. Current instruments still active that were also active on gap_date
+    all_current = provider.sync_instruments()
+    nifty_current = filter_nifty_derivatives(
+        all_current,
+        symbol_name="NIFTY",
+        derivative_segment=settings.derivative_segment,
+    )
+
+    current_keys_seen: set = set()
+
+    # 2a. Futures from current catalog active on gap_date
+    current_futures = sorted(
+        [r for r in nifty_current
+         if r.get("instrument_type") == "FUT"
+         and _row_expiry(r) is not None
+         and _row_expiry(r) >= gap_date],
+        key=lambda r: _row_expiry(r),
+    )
+    for index, row in enumerate(current_futures):
+        role = "future_front" if index == 0 else ("future_next" if index == 1 else "future_far")
+        item = _row_to_universe_item(row, role)
+        universe.append(item)
+        if item.instrument_key:
+            current_keys_seen.add(item.instrument_key)
+
+    # 2b. Options from current catalog active on gap_date within DTE horizon
+    current_options = [
+        r for r in nifty_current
+        if r.get("instrument_type") in {"CE", "PE"}
+        and _row_expiry(r) is not None
+        and _row_expiry(r) >= gap_date
+        and (_row_expiry(r) - gap_date).days <= max_dte
+    ]
+    for row in current_options:
+        item = _row_to_universe_item(row, "option")
+        universe.append(item)
+        if item.instrument_key:
+            current_keys_seen.add(item.instrument_key)
+
+    # 3. Expired contracts not in current catalog
+    try:
+        rate_limiter.wait_if_needed()
+        all_expired_expiries = fetch_expired_expiries(provider.client, spot_key)
+    except Exception as exc:
+        log.warning("Failed to fetch expired expiries: %s", exc)
+        all_expired_expiries = []
+
+    # Filter to expiries active on gap_date and within DTE horizon
+    relevant_expiries = [
+        e for e in all_expired_expiries
+        if date.fromisoformat(e) >= gap_date
+        and (date.fromisoformat(e) - gap_date).days <= max_dte
+    ]
+    # Include one expiry beyond horizon for stable 90D interpolation
+    beyond = [
+        e for e in all_expired_expiries
+        if date.fromisoformat(e) > gap_date + timedelta(days=max_dte)
+    ]
+    if beyond:
+        relevant_expiries.append(beyond[0])
+
+    for exp_str in relevant_expiries:
+        rate_limiter.wait_if_needed()
+        try:
+            contracts = fetch_expired_option_contracts(provider.client, spot_key, exp_str)
+        except Exception as exc:
+            log.warning("Failed to fetch expired contracts for %s: %s", exp_str, exc)
+            continue
+
+        exp_date = date.fromisoformat(exp_str)
+        for c in contracts:
+            ikey = c.get("expired_instrument_key") or c.get("instrument_key") or ""
+            if not ikey or ikey in current_keys_seen:
+                continue
+            current_keys_seen.add(ikey)
+            universe.append(ProbeUniverseItem(
+                role="option",
+                exchange="NFO",
+                tradingsymbol=c.get("tradingsymbol") or c.get("trading_symbol") or "",
+                instrument_key=ikey,
+                provider="upstox",
+                segment="NSE_FO",
+                instrument_type=c.get("instrument_type") or c.get("option_type"),
+                expiry=exp_date,
+                strike=float(c["strike_price"]) if c.get("strike_price") else None,
+                option_type=c.get("option_type") or c.get("instrument_type"),
+            ))
+
+    # 4. Moneyness filter — get gap-date spot price
+    try:
+        rate_limiter.wait_if_needed()
+        spot_candles = fetch_historical_candles(
+            provider.client, spot_key, interval="day",
+            from_date=gap_date, to_date=gap_date,
+        )
+        if spot_candles:
+            gap_spot = spot_candles[0]["close"]
+        else:
+            gap_spot = None
+    except Exception:
+        gap_spot = None
+
+    if gap_spot is not None:
+        # Keep options within 80-120% moneyness of gap-date spot
+        min_strike = gap_spot * 0.80
+        max_strike = gap_spot * 1.20
+        universe = [
+            item for item in universe
+            if item.role != "option" or item.strike is None
+            or min_strike <= item.strike <= max_strike
+        ]
+
+    log.info("Built historical universe for %s: %d instruments (%d expired contracts fetched)",
+             gap_date, len(universe), sum(1 for i in universe if i.instrument_key and i.instrument_key not in current_keys_seen))
+
+    return universe
+
+
+def _row_expiry(row: Dict) -> Optional[date]:
+    """Extract expiry date from an instrument row."""
+    value = row.get("expiry")
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _row_to_universe_item(row: Dict, role: str) -> ProbeUniverseItem:
+    """Convert an instrument row dict to a ProbeUniverseItem."""
+    expiry = _row_expiry(row)
+    strike_val = row.get("strike") or row.get("strike_price")
+    return ProbeUniverseItem(
+        role=role,
+        exchange="NFO",
+        tradingsymbol=row.get("tradingsymbol") or row.get("trading_symbol") or "",
+        instrument_key=row.get("instrument_key"),
+        instrument_token=int(row["instrument_token"]) if row.get("instrument_token") else None,
+        provider="upstox",
+        segment=row.get("segment"),
+        instrument_type=row.get("instrument_type"),
+        expiry=expiry,
+        strike=float(strike_val) if strike_val else None,
+        option_type=row.get("option_type"),
+        lot_size=int(row["lot_size"]) if row.get("lot_size") else None,
+    )
+
+
 # ── Backfill pipeline ────────────────────────────────────────────────
 
 def backfill_day(
@@ -164,6 +358,9 @@ def backfill_day(
     rate: float,
     rate_limiter: RateLimiter,
     db=None,  # WorkerDatabase
+    baselines: Optional[Dict[str, List[float]]] = None,
+    flow_baselines: Optional[Dict[str, List[float]]] = None,
+    prior_close: Optional[Dict[str, Optional[float]]] = None,
 ) -> Dict:
     """Backfill one gap day using historical candles.
 
@@ -172,17 +369,70 @@ def backfill_day(
 
     Returns summary dict.
     """
+    day = gap.gap_date
+    log.info("Backfilling %s (%s, ~%d minutes)", day, gap.gap_type, gap.missing_minutes)
+
+    # Gap-fill log tracking
+    log_id = None
+    gap_start_ts = datetime.combine(day, MARKET_OPEN, tzinfo=IST)
+    gap_end_ts = datetime.combine(day, MARKET_CLOSE, tzinfo=IST)
+    if db is not None:
+        try:
+            log_id = db.insert_gap_fill_log(gap_start_ts, gap_end_ts, gap.gap_type, gap.missing_minutes)
+            db.commit()
+        except Exception as log_exc:
+            log.warning("Failed to insert gap_fill_log: %s", log_exc)
+
+    minutes_filled = 0
+    try:
+        result = _backfill_day_inner(
+            gap, universe, client, rate, rate_limiter, db,
+            baselines=baselines, flow_baselines=flow_baselines,
+            prior_close=prior_close or {},
+        )
+        minutes_filled = result["minutes_filled"]
+
+        if db is not None and log_id:
+            minutes = market_minutes_for_day(day)
+            status = "completed" if minutes_filled == len(minutes) else (
+                "partial" if minutes_filled > 0 else "unfillable")
+            db.update_gap_fill_log(log_id, status, minutes_filled)
+            db.commit()
+
+        return result
+
+    except Exception as exc:
+        if db is not None and log_id:
+            try:
+                db.update_gap_fill_log(log_id, "unfillable", minutes_filled, str(exc)[:500])
+                db.commit()
+            except Exception:
+                pass
+        raise
+
+
+def _backfill_day_inner(
+    gap: Gap,
+    universe: Sequence[ProbeUniverseItem],
+    client,
+    rate: float,
+    rate_limiter: RateLimiter,
+    db=None,
+    baselines: Optional[Dict[str, List[float]]] = None,
+    flow_baselines: Optional[Dict[str, List[float]]] = None,
+    prior_close: Optional[Dict[str, Optional[float]]] = None,
+) -> Dict:
+    """Inner backfill logic extracted for gap_fill_log wrapping."""
     from phase0.providers.upstox.history import (
         fetch_expired_historical_candles,
         fetch_historical_candles,
     )
 
     day = gap.gap_date
-    log.info("Backfilling %s (%s, ~%d minutes)", day, gap.gap_type, gap.missing_minutes)
 
     # Collect all option instruments
     option_items = [item for item in universe if item.role == "option" and item.instrument_key]
-    future_items = [item for item in universe if item.role == "future_front" and item.instrument_key]
+    future_items = [item for item in universe if item.role.startswith("future") and item.instrument_key]
     spot_items = [item for item in universe if item.role == "spot" and item.instrument_key]
 
     # Fetch candles for each instrument
@@ -228,8 +478,28 @@ def backfill_day(
         return {"day": day.isoformat(), "minutes_filled": 0, "fetch_count": fetch_count}
 
     # Build per-minute synthetic snapshots and run pipeline
+    from dataclasses import asdict
+    from phase0.interpolation import interpolate_constant_maturity
+    from phase0.metrics import (
+        FLOW_BASE_METRICS,
+        compute_flow_metrics,
+        compute_level_metrics,
+        compute_surface_grid,
+        level_metrics_to_dict,
+    )
+    from worker.buffers import FlowRingBuffer
+    from worker.percentile import (
+        compute_abs_flow_percentiles,
+        compute_level_percentiles,
+        compute_state_score,
+        compute_stress_score,
+    )
+
     minutes = market_minutes_for_day(day)
     minutes_filled = 0
+    flow_buffer = FlowRingBuffer()
+    last_level_dict: Optional[Dict[str, Optional[float]]] = None
+    last_flow_dict: Optional[Dict[str, Optional[float]]] = None
 
     for minute_ts in minutes:
         option_rows = _build_synthetic_option_rows(
@@ -251,15 +521,36 @@ def backfill_day(
         )
 
         if expiry_nodes and db is not None:
-            from dataclasses import asdict
-            from phase0.interpolation import interpolate_constant_maturity
-            from phase0.metrics import compute_level_metrics, compute_surface_grid
-
-            # Pipeline: expiry_nodes → CM → metrics → surface
+            # Pipeline: expiry_nodes → CM → metrics → surface → flow → scores
             cm_nodes = interpolate_constant_maturity(expiry_nodes)
             level_points = compute_level_metrics(cm_nodes, minute_ts)
+            level_dict = level_metrics_to_dict(level_points)
             surface_cells = compute_surface_grid(cm_nodes, minute_ts)
 
+            # Flow metrics
+            flow_buffer.append(minute_ts, {k: level_dict.get(k) for k in FLOW_BASE_METRICS})
+            lagged = flow_buffer.get_lagged(minute_ts)
+            flow_points = compute_flow_metrics(
+                current_levels={k: level_dict.get(k) for k in FLOW_BASE_METRICS},
+                lagged_levels=lagged,
+                prior_close=prior_close or {},
+                ts=minute_ts,
+            )
+            flow_dict = {p.metric_key: p.value for p in flow_points}
+
+            # Percentiles and scores (if baselines available)
+            level_pcts: Dict[str, Optional[float]] = {}
+            state_score: Optional[float] = None
+            stress_score: Optional[float] = None
+
+            if baselines:
+                level_pcts = compute_level_percentiles(level_dict, baselines)
+                state_score = compute_state_score(level_pcts)
+            if flow_baselines:
+                abs_flow_pcts = compute_abs_flow_percentiles(flow_dict, flow_baselines)
+                stress_score = compute_stress_score(abs_flow_pcts)
+
+            # Write to DB
             node_rows = [asdict(n) for n in expiry_nodes]
             db.upsert_expiry_nodes(node_rows, source_mode="historical_backfill")
 
@@ -276,14 +567,36 @@ def backfill_day(
             ]
             db.upsert_cm_nodes(cm_rows, source_mode="historical_backfill")
 
+            # Level + flow + score metric rows
             metric_rows = [
+                {
+                    "ts": p.ts, "metric_key": p.metric_key,
+                    "tenor_code": p.tenor_code, "window_code": p.window_code,
+                    "value": p.value,
+                    "percentile": level_pcts.get(p.metric_key),
+                    "provisional": True,
+                }
+                for p in level_points
+            ] + [
                 {
                     "ts": p.ts, "metric_key": p.metric_key,
                     "tenor_code": p.tenor_code, "window_code": p.window_code,
                     "value": p.value, "percentile": None, "provisional": True,
                 }
-                for p in level_points
+                for p in flow_points
             ]
+            if state_score is not None:
+                metric_rows.append({
+                    "ts": minute_ts, "metric_key": "state_score",
+                    "tenor_code": None, "window_code": None,
+                    "value": state_score, "percentile": None, "provisional": True,
+                })
+            if stress_score is not None:
+                metric_rows.append({
+                    "ts": minute_ts, "metric_key": "stress_score",
+                    "tenor_code": None, "window_code": None,
+                    "value": stress_score, "percentile": None, "provisional": True,
+                })
             db.upsert_metric_series(metric_rows, source_mode="historical_backfill")
 
             surface_rows = [
@@ -295,10 +608,42 @@ def backfill_day(
             ]
             db.upsert_surface_cells(surface_rows)
 
+            last_level_dict = level_dict
+            last_flow_dict = flow_dict
+
             if minutes_filled % 50 == 0:
                 db.commit()
 
         minutes_filled += 1
+
+    # Write end-of-day baselines for full-day backfills
+    if db is not None and gap.gap_type == "full_day" and last_level_dict:
+        baseline_rows = [
+            {"metric_date": day, "metric_key": k, "close_value": v}
+            for k, v in last_level_dict.items() if v is not None
+        ]
+        if baseline_rows:
+            db.upsert_metric_baselines(baseline_rows)
+            log.info("Wrote %d level baselines for backfilled %s", len(baseline_rows), day)
+
+        # Flow baselines from last minute
+        if last_flow_dict:
+            flow_baseline_rows = []
+            for fkey, fval in last_flow_dict.items():
+                if fval is None or not fkey.startswith("d_"):
+                    continue
+                # Parse d_<metric_key>_<window_code>
+                parts = fkey[2:].rsplit("_", 1)
+                if len(parts) == 2:
+                    flow_baseline_rows.append({
+                        "metric_date": day,
+                        "metric_key": parts[0],
+                        "window_code": parts[1],
+                        "change_value": fval,
+                    })
+            if flow_baseline_rows:
+                db.upsert_flow_baselines(flow_baseline_rows)
+                log.info("Wrote %d flow baselines for backfilled %s", len(flow_baseline_rows), day)
 
     if db is not None:
         db.commit()

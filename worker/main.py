@@ -9,7 +9,7 @@ import signal
 import sys
 import time as time_mod
 from dataclasses import asdict
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Dict, List, Optional
 
 from phase0.config import Settings, load_settings
@@ -29,6 +29,7 @@ from phase0.time_utils import indian_timezone
 from worker.daily_brief import generate_daily_brief, generate_dashboard_payload
 from worker.db import WorkerDatabase
 from worker.percentile import (
+    compute_abs_flow_percentiles,
     compute_flow_percentiles,
     compute_level_percentiles,
     compute_state_score,
@@ -69,63 +70,7 @@ def infer_phase(now: datetime, settings: Settings) -> str:
     return "idle"
 
 
-# ── Ring buffer for flow metric lookback ─────────────────────────────
-
-class FlowRingBuffer:
-    """In-memory ring buffer for recent level metric values.
-
-    Stores up to max_minutes of historical level snapshots for
-    computing flow metrics (5m, 15m, 60m deltas). Canonical source
-    is the DB; this is an accelerator only.
-    """
-
-    def __init__(self, max_minutes: int = 65):
-        self.max_minutes = max_minutes
-        self._buffer: List[Dict] = []  # [{ts, metrics: {key: val}}]
-
-    def append(self, ts: datetime, metrics: Dict[str, Optional[float]]) -> None:
-        self._buffer.append({"ts": ts, "metrics": dict(metrics)})
-        cutoff = ts - timedelta(minutes=self.max_minutes)
-        self._buffer = [e for e in self._buffer if e["ts"] >= cutoff]
-
-    def get_lagged(self, current_ts: datetime) -> Dict[str, Dict[str, Optional[float]]]:
-        """Return lagged values for each flow window."""
-        windows = {"5m": 5, "15m": 15, "60m": 60}
-        result: Dict[str, Dict[str, Optional[float]]] = {}
-        for window_code, minutes in windows.items():
-            target_ts = current_ts - timedelta(minutes=minutes)
-            closest = self._find_closest(target_ts)
-            if closest is not None:
-                result[window_code] = closest["metrics"]
-        return result
-
-    def _find_closest(self, target_ts: datetime) -> Optional[Dict]:
-        if not self._buffer:
-            return None
-        best = None
-        best_delta = None
-        for entry in self._buffer:
-            delta = abs((entry["ts"] - target_ts).total_seconds())
-            if delta <= 90 and (best_delta is None or delta < best_delta):
-                best = entry
-                best_delta = delta
-        return best
-
-    def seed_from_db(self, db: WorkerDatabase, ref_ts: datetime) -> None:
-        """Seed ring buffer from DB on startup/restart."""
-        keys = list(FLOW_BASE_METRICS)
-        data = db.fetch_latest_metric_values(keys, self.max_minutes, ref_ts)
-        # Reconstruct per-minute entries
-        by_ts: Dict[datetime, Dict] = {}
-        for key, rows in data.items():
-            for row in rows:
-                ts = row["ts"]
-                entry = by_ts.setdefault(ts, {})
-                entry[key] = float(row["value"]) if row["value"] is not None else None
-        for ts in sorted(by_ts.keys()):
-            self.append(ts, by_ts[ts])
-        if self._buffer:
-            log.info("Seeded flow ring buffer with %d entries", len(self._buffer))
+from worker.buffers import FlowRingBuffer  # noqa: E402 (extracted to avoid circular import)
 
 
 # ── Pipeline: process one sealed minute ──────────────────────────────
@@ -179,10 +124,13 @@ def process_sealed_minute(
         level_pcts = compute_level_percentiles(level_dict, baselines)
     if flow_baselines is not None:
         flow_pcts = compute_flow_percentiles(flow_dict, flow_baselines)
+        abs_flow_pcts = compute_abs_flow_percentiles(flow_dict, flow_baselines)
+    else:
+        abs_flow_pcts = {}
     if level_pcts:
         state_score = compute_state_score(level_pcts)
-    if flow_pcts:
-        stress_score = compute_stress_score(flow_pcts)
+    if abs_flow_pcts:
+        stress_score = compute_stress_score(abs_flow_pcts)
 
     # 6. Surface grid
     surface_cells = compute_surface_grid(cm_nodes, ts)
@@ -226,6 +174,25 @@ def process_sealed_minute(
             }
             for p in flow_points
         ]
+
+        # Score rows
+        if state_score is not None:
+            metric_rows.append({
+                "ts": ts, "metric_key": "state_score",
+                "tenor_code": None, "window_code": None,
+                "value": state_score, "percentile": None,
+                "provisional": baselines is None or any(
+                    len(baselines.get(k, [])) < 60 for k in LEVEL_METRIC_KEYS),
+            })
+        if stress_score is not None:
+            metric_rows.append({
+                "ts": ts, "metric_key": "stress_score",
+                "tenor_code": None, "window_code": None,
+                "value": stress_score, "percentile": None,
+                "provisional": flow_baselines is None or any(
+                    len(flow_baselines.get(k, [])) < 60 for k in FLOW_METRIC_KEYS),
+            })
+
         db.upsert_metric_series(metric_rows, source_mode=source_mode)
 
         # Surface cells
@@ -267,6 +234,7 @@ class Worker:
         self.flow_buffer = FlowRingBuffer()
         self.prior_close: Dict[str, Optional[float]] = {}
         self.last_minute_sealed: Optional[datetime] = None
+        self._post_market_done_date: Optional[date] = None
         self._stop = False
 
     def run(self) -> None:
@@ -448,6 +416,12 @@ class Worker:
 
     def _run_post_market(self) -> None:
         """Post-market: write baselines, compute closing percentiles, generate daily brief."""
+        today = datetime.now(IST).date()
+        if self._post_market_done_date == today:
+            log.info("Post-market already completed for %s", today)
+            self._sleep(60)
+            return
+
         log.info("Post-market phase: writing baselines and daily brief")
         self._update_heartbeat("post_market")
 
@@ -457,7 +431,6 @@ class Worker:
 
         try:
             with WorkerDatabase(self.settings.supabase_db_url) as db:
-                today = datetime.now(IST).date()
 
                 # 1. Fetch today's last metric values from DB
                 last_metrics = db.fetch_last_minute_metrics(today)
@@ -504,8 +477,9 @@ class Worker:
 
                 level_pcts = compute_level_percentiles(level_dict, baselines)
                 flow_pcts = compute_flow_percentiles(flow_dict, flow_baselines_data)
+                abs_flow_pcts = compute_abs_flow_percentiles(flow_dict, flow_baselines_data)
                 state_score = compute_state_score(level_pcts)
-                stress_score = compute_stress_score(flow_pcts)
+                stress_score = compute_stress_score(abs_flow_pcts)
 
                 log.info("Closing scores: state=%.1f, stress=%.1f",
                          state_score or 0, stress_score or 0)
@@ -526,6 +500,7 @@ class Worker:
                 log.info("Daily brief written for %s: %s", today, brief.get("headline", ""))
 
                 self._update_heartbeat("post_market", db=db)
+                self._post_market_done_date = today
 
         except Exception as exc:
             log.error("Post-market error: %s", exc, exc_info=True)
@@ -570,7 +545,7 @@ class Worker:
 
     def _run_gap_fill_with_db(self, db: WorkerDatabase, universe, provider) -> None:
         """Detect and fill gaps using an existing DB connection."""
-        from worker.gap_fill import RateLimiter, backfill_day, detect_gaps
+        from worker.gap_fill import RateLimiter, backfill_day, build_historical_universe, detect_gaps
 
         last_sealed = db.fetch_last_sealed_ts()
         gaps = detect_gaps(last_sealed, datetime.now(IST), self.settings.backfill_days)
@@ -581,12 +556,32 @@ class Worker:
 
         log.info("Detected %d gap(s) to fill", len(gaps))
         rate_limiter = RateLimiter()
+
+        # Load baselines once for all gaps
+        gap_baselines = db.fetch_metric_baselines(lookback_days=252)
+        gap_flow_baselines = db.fetch_flow_baselines(lookback_days=252)
+
         for gap in gaps:
             if self._stop:
                 break
+            if gap.gap_date == datetime.now(IST).date():
+                backfill_universe = universe
+            else:
+                backfill_universe = build_historical_universe(
+                    provider, gap.gap_date, self.settings, rate_limiter)
+
+            # Load prior close for the gap date
+            from worker.calendar import previous_trading_day
+            gap_prev_day = previous_trading_day(gap.gap_date)
+            gap_prior_close_data = db.fetch_last_minute_metrics(gap_prev_day)
+            gap_prior_close = {k: gap_prior_close_data.get(k) for k in FLOW_BASE_METRICS}
+
             result = backfill_day(
-                gap, universe, provider.client,
+                gap, backfill_universe, provider.client,
                 self.settings.risk_free_rate, rate_limiter, db,
+                baselines=gap_baselines,
+                flow_baselines=gap_flow_baselines,
+                prior_close=gap_prior_close,
             )
             log.info("Gap-fill result: %s", result)
 

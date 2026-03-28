@@ -52,7 +52,7 @@ def build_key_cards(
 
     _CARD_DEFS = [
         ("ATM IV 7D", "atm_iv_7d", "d_atm_iv_7d_1d", "vol"),
-        ("ATM IV 30D", "atm_iv_30d", "d_atm_iv_7d_1d", "vol"),
+        ("ATM IV 30D", "atm_iv_30d", "d_atm_iv_30d_1d", "vol"),
         ("Term Spread 7-30D", "term_7d_30d", "d_front_end_dominance_1d", "spread"),
         ("Risk Reversal 30D", "rr25_30d", "d_rr25_30d_1d", "skew"),
         ("Butterfly 30D", "bf25_30d", "d_bf25_30d_1d", "convexity"),

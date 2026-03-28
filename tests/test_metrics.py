@@ -114,7 +114,7 @@ class TestLevelMetrics(unittest.TestCase):
 
 
 class TestFlowMetrics(unittest.TestCase):
-    def test_returns_16_metrics(self):
+    def test_returns_20_metrics(self):
         current = {"atm_iv_7d": 0.22, "rr25_30d": -0.03, "bf25_30d": 0.005, "front_end_dominance": 0.02}
         lagged = {
             "5m": {"atm_iv_7d": 0.21, "rr25_30d": -0.025, "bf25_30d": 0.004, "front_end_dominance": 0.018},
@@ -123,7 +123,7 @@ class TestFlowMetrics(unittest.TestCase):
         }
         prior_close = {"atm_iv_7d": 0.18, "rr25_30d": -0.01, "bf25_30d": 0.001, "front_end_dominance": 0.005}
         points = compute_flow_metrics(current, lagged, prior_close, TS)
-        self.assertEqual(len(points), 16)
+        self.assertEqual(len(points), 20)
 
     def test_all_flow_keys_present(self):
         current = {k: 0.1 for k in FLOW_BASE_METRICS}

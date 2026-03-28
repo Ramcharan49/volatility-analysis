@@ -162,7 +162,7 @@ class TestProcessSealedMinute(unittest.TestCase):
         self.assertEqual(summary["expiry_nodes"], 1)
         self.assertGreater(summary["cm_nodes"], 0)
         self.assertEqual(summary["level_metrics"], 13)
-        self.assertEqual(summary["flow_metrics"], 16)
+        self.assertEqual(summary["flow_metrics"], 20)
         self.assertEqual(summary["surface_cells"], 15)
 
 

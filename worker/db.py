@@ -318,7 +318,7 @@ class WorkerDatabase:
     def fetch_flow_baselines(self, lookback_days: int = 252) -> Dict[str, List[float]]:
         """Load historical flow changes for flow percentile computation."""
         sql = """
-            SELECT metric_key || '_' || window_code AS flow_key, change_value
+            SELECT 'd_' || metric_key || '_' || window_code AS flow_key, change_value
             FROM analytics.flow_baselines
             WHERE metric_date >= %s
             ORDER BY metric_key, window_code, metric_date
@@ -353,6 +353,34 @@ class WorkerDatabase:
             cur.execute(sql)
             row = cur.fetchone()
             return row[0] if row else None
+
+    # ── Gap fill log ─────────────────────────────────────────────
+
+    def insert_gap_fill_log(self, gap_start_ts: datetime, gap_end_ts: datetime,
+                            gap_type: str, minutes_expected: int) -> str:
+        """Insert a gap_fill_log row with status='filling'. Returns UUID string."""
+        sql = """
+            INSERT INTO ops.gap_fill_log (gap_start_ts, gap_end_ts, gap_type, status,
+                minutes_expected, attempt_count, started_at)
+            VALUES (%s, %s, %s, 'filling', %s, 1, now())
+            RETURNING id::text
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(sql, (gap_start_ts, gap_end_ts, gap_type, minutes_expected))
+            row = cur.fetchone()
+            return row[0]
+
+    def update_gap_fill_log(self, log_id: str, status: str, minutes_filled: int,
+                            error_message: Optional[str] = None) -> None:
+        """Update gap_fill_log status to completed/partial/unfillable."""
+        sql = """
+            UPDATE ops.gap_fill_log
+            SET status = %s, minutes_filled = %s, error_message = %s,
+                completed_at = now()
+            WHERE id = %s::uuid
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(sql, (status, minutes_filled, error_message, log_id))
 
     # ── Internals ─────────────────────────────────────────────────
 
