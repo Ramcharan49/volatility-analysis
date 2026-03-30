@@ -201,6 +201,7 @@ def build_historical_universe(
         symbol_name="NIFTY",
         derivative_segment=settings.derivative_segment,
     )
+    log.info("  sync_instruments: %d total, %d NIFTY derivatives", len(all_current), len(nifty_current))
 
     current_keys_seen: set = set()
 
@@ -212,6 +213,7 @@ def build_historical_universe(
          and _row_expiry(r) >= gap_date],
         key=lambda r: _row_expiry(r),
     )
+    log.info("  Current futures active on %s: %d", gap_date, len(current_futures))
     for index, row in enumerate(current_futures):
         role = "future_front" if index == 0 else ("future_next" if index == 1 else "future_far")
         item = _row_to_universe_item(row, role)
@@ -227,6 +229,7 @@ def build_historical_universe(
         and _row_expiry(r) >= gap_date
         and (_row_expiry(r) - gap_date).days <= max_dte
     ]
+    log.info("  Current options active on %s (DTE <= %d): %d", gap_date, max_dte, len(current_options))
     for row in current_options:
         item = _row_to_universe_item(row, "option")
         universe.append(item)
@@ -241,12 +244,15 @@ def build_historical_universe(
         log.warning("Failed to fetch expired expiries: %s", exc)
         all_expired_expiries = []
 
+    log.info("  Expired expiries from API: %d %s", len(all_expired_expiries),
+             all_expired_expiries[:5] if all_expired_expiries else "(empty)")
     # Filter to expiries active on gap_date and within DTE horizon
     relevant_expiries = [
         e for e in all_expired_expiries
         if date.fromisoformat(e) >= gap_date
         and (date.fromisoformat(e) - gap_date).days <= max_dte
     ]
+    log.info("  Relevant expired expiries (active on %s, DTE <= %d): %d", gap_date, max_dte, len(relevant_expiries))
     # Include one expiry beyond horizon for stable 90D interpolation
     beyond = [
         e for e in all_expired_expiries
@@ -317,14 +323,20 @@ def _row_expiry(row: Dict) -> Optional[date]:
     value = row.get("expiry")
     if value is None:
         return None
-    if isinstance(value, date):
-        return value
     if isinstance(value, datetime):
         return value.date()
+    if isinstance(value, date):
+        return value
     if isinstance(value, str):
         try:
             return date.fromisoformat(value)
         except ValueError:
+            return None
+    if isinstance(value, (int, float)):
+        try:
+            ts = value / 1000 if value > 1e10 else value
+            return datetime.fromtimestamp(ts, tz=IST).date()
+        except (OSError, ValueError, OverflowError):
             return None
     return None
 

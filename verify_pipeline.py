@@ -409,7 +409,56 @@ def run_history(settings, args) -> int:
 
     rate_limiter = RateLimiter()
 
-    # Build historical universe for target date
+    # ── Diagnostic: instrument counts before build_historical_universe ──
+    from phase0.instruments import filter_nifty_derivatives
+    from worker.gap_fill import _row_expiry
+
+    log.info("Running instrument diagnostics for %s...", target_date)
+    all_instruments = provider.sync_instruments()
+    log.info("  sync_instruments() returned %d rows", len(all_instruments))
+
+    nifty_derivs = filter_nifty_derivatives(
+        all_instruments,
+        symbol_name=settings.phase0_symbol,
+        derivative_segment=settings.derivative_segment,
+    )
+    log.info("  filter_nifty_derivatives() → %d rows", len(nifty_derivs))
+
+    if nifty_derivs:
+        # Show sample instrument_type values
+        itypes = set(r.get("instrument_type") for r in nifty_derivs)
+        log.info("  instrument_type values: %s", itypes)
+
+        # Show sample expiry values and _row_expiry results
+        sample = nifty_derivs[:3]
+        for r in sample:
+            raw_exp = r.get("expiry")
+            parsed = _row_expiry(r)
+            log.info("  sample: type=%s expiry_raw=%r (%s) → _row_expiry=%s",
+                     r.get("instrument_type"), raw_exp, type(raw_exp).__name__, parsed)
+
+        # Count instruments at each filter stage
+        has_expiry = [r for r in nifty_derivs if _row_expiry(r) is not None]
+        log.info("  _row_expiry() not None: %d / %d", len(has_expiry), len(nifty_derivs))
+
+        futures_all = [r for r in nifty_derivs if r.get("instrument_type") == "FUT"]
+        futures_active = [r for r in futures_all if _row_expiry(r) is not None and _row_expiry(r) >= target_date]
+        log.info("  Futures: total=%d, expiry >= %s: %d", len(futures_all), target_date, len(futures_active))
+
+        options_all = [r for r in nifty_derivs if r.get("instrument_type") in {"CE", "PE"}]
+        options_with_exp = [r for r in options_all if _row_expiry(r) is not None and _row_expiry(r) >= target_date]
+        options_in_dte = [r for r in options_with_exp if (_row_expiry(r) - target_date).days <= settings.max_dte_days]
+        log.info("  Options: total=%d, expiry >= %s: %d, within %d DTE: %d",
+                 len(options_all), target_date, len(options_with_exp), settings.max_dte_days, len(options_in_dte))
+    else:
+        log.warning("  NO nifty derivatives found — checking raw data...")
+        # Show what segments/names exist
+        segments = set(r.get("segment") for r in all_instruments[:100])
+        names = set(r.get("name") for r in all_instruments[:100])
+        log.info("  Sample segments: %s", segments)
+        log.info("  Sample names: %s", list(names)[:10])
+
+    # ── Now build the actual universe ──
     log.info("Building historical universe for %s...", target_date)
     universe = build_historical_universe(provider, target_date, settings, rate_limiter)
     log.info("  Universe: %d instruments", len(universe))

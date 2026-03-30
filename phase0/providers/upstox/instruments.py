@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gzip
 import json
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 from typing import Dict, List, Optional
 
@@ -29,13 +29,22 @@ def download_instruments(segment_filter: Optional[str] = None) -> List[Dict]:
 
 
 def _normalize_instrument_row(raw: Dict) -> Dict:
-    expiry_str = raw.get("expiry")
+    expiry_raw = raw.get("expiry")
     expiry = None
-    if expiry_str:
-        try:
-            expiry = date.fromisoformat(expiry_str) if isinstance(expiry_str, str) else expiry_str
-        except (ValueError, TypeError):
-            expiry = None
+    if expiry_raw is not None:
+        if isinstance(expiry_raw, str):
+            try:
+                expiry = date.fromisoformat(expiry_raw)
+            except (ValueError, TypeError):
+                expiry = None
+        elif isinstance(expiry_raw, (int, float)):
+            try:
+                ts = expiry_raw / 1000 if expiry_raw > 1e10 else expiry_raw
+                expiry = datetime.fromtimestamp(ts).date()
+            except (ValueError, OSError, OverflowError):
+                expiry = None
+        elif isinstance(expiry_raw, date):
+            expiry = expiry_raw
 
     strike = raw.get("strike_price")
     if strike is not None:
