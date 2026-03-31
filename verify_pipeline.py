@@ -140,6 +140,91 @@ def _load_baselines(settings):
         return None, None
 
 
+# ── Persist results to Supabase ────────────────────────────────────
+
+def _persist_to_db(settings, ts, expiry_nodes, result, baselines, flow_baselines,
+                   source_mode="snapshot"):
+    """Write pipeline results to Supabase. Mirrors worker/main.py process_sealed_minute."""
+    if not settings.supabase_db_url:
+        return
+    from worker.daily_brief import generate_dashboard_payload
+    from worker.db import WorkerDatabase
+
+    with WorkerDatabase(settings.supabase_db_url) as db:
+        # 1. Expiry nodes
+        db.upsert_expiry_nodes([asdict(n) for n in expiry_nodes], source_mode=source_mode)
+
+        # 2. CM nodes
+        cm_rows = [
+            {
+                "ts": n.ts, "tenor_code": n.tenor_code, "tenor_days": n.tenor_days,
+                "atm_iv": n.atm_iv, "iv_25c": n.iv_25c, "iv_25p": n.iv_25p,
+                "iv_10c": n.iv_10c, "iv_10p": n.iv_10p,
+                "rr25": n.rr25, "bf25": n.bf25,
+                "quality": n.quality,
+                "bracket_expiries": [e.isoformat() for e in n.bracket_expiries],
+            }
+            for n in result["cm_nodes"]
+        ]
+        db.upsert_cm_nodes(cm_rows, source_mode=source_mode)
+
+        # 3. Metric series (level + flow + scores)
+        metric_rows = [
+            {
+                "ts": p.ts, "metric_key": p.metric_key,
+                "tenor_code": p.tenor_code, "window_code": p.window_code,
+                "value": p.value,
+                "percentile": result["level_pcts"].get(p.metric_key),
+                "provisional": baselines is None or len((baselines or {}).get(p.metric_key, [])) < 60,
+            }
+            for p in result["level_points"]
+        ] + [
+            {
+                "ts": p.ts, "metric_key": p.metric_key,
+                "tenor_code": p.tenor_code, "window_code": p.window_code,
+                "value": p.value,
+                "percentile": result["flow_pcts"].get(p.metric_key),
+                "provisional": flow_baselines is None or len((flow_baselines or {}).get(p.metric_key, [])) < 60,
+            }
+            for p in result["flow_points"]
+        ]
+        if result["state_score"] is not None:
+            metric_rows.append({
+                "ts": ts, "metric_key": "state_score",
+                "tenor_code": None, "window_code": None,
+                "value": result["state_score"], "percentile": None,
+                "provisional": baselines is None,
+            })
+        if result["stress_score"] is not None:
+            metric_rows.append({
+                "ts": ts, "metric_key": "stress_score",
+                "tenor_code": None, "window_code": None,
+                "value": result["stress_score"], "percentile": None,
+                "provisional": flow_baselines is None,
+            })
+        db.upsert_metric_series(metric_rows, source_mode=source_mode)
+
+        # 4. Surface cells
+        surface_rows = [
+            {
+                "tenor_code": c.tenor_code, "delta_bucket": c.delta_bucket,
+                "as_of": ts, "iv": c.iv, "quality_score": c.quality_score,
+            }
+            for c in result["surface_cells"]
+        ]
+        db.upsert_surface_cells(surface_rows)
+
+        # 5. Dashboard
+        dashboard_payload = generate_dashboard_payload(
+            ts, result["state_score"], result["stress_score"],
+            result["level_dict"], result["level_pcts"], result["flow_dict"],
+        )
+        db.upsert_dashboard(dashboard_payload)
+
+        db.commit()
+    log.info("Persisted to Supabase (%s)", source_mode)
+
+
 # ── Pipeline: process one minute of data ─────────────────────────────
 
 def _run_pipeline_for_minute(
@@ -274,6 +359,7 @@ def run_snapshot(settings, args) -> int:
         spot_price=spot_ltp,
         rate=settings.risk_free_rate,
         allow_ltp_fallback=True,
+        strike_step=settings.strike_step,
     )
     log.info("  %d expiry nodes", len(expiry_nodes))
 
@@ -291,6 +377,14 @@ def run_snapshot(settings, args) -> int:
         baselines=baselines,
         flow_baselines=flow_baselines,
     )
+
+    # Persist to DB (if not skipped)
+    if not args.skip_db:
+        try:
+            _persist_to_db(settings, snapshot_ts, expiry_nodes, result,
+                           baselines, flow_baselines, source_mode="snapshot")
+        except Exception as exc:
+            log.warning("DB persist failed: %s", exc)
 
     # Write CSVs
     now = datetime.now(IST)
@@ -567,6 +661,7 @@ def run_history(settings, args) -> int:
             spot_price=spot_price,
             rate=settings.risk_free_rate,
             allow_ltp_fallback=True,
+            strike_step=settings.strike_step,
         )
 
         if not expiry_nodes:
@@ -638,6 +733,82 @@ def run_history(settings, args) -> int:
     if minutes_with_data == 0:
         log.error("No minutes produced data — cannot write CSVs")
         return 1
+
+    # Persist to DB (batch — all minutes at once)
+    if not args.skip_db and settings.supabase_db_url:
+        try:
+            from worker.daily_brief import generate_dashboard_payload
+            from worker.db import WorkerDatabase
+
+            log.info("Persisting %d minutes to Supabase...", minutes_with_data)
+            with WorkerDatabase(settings.supabase_db_url) as db:
+                # Expiry nodes
+                db.upsert_expiry_nodes(all_expiry_rows, source_mode="backfill")
+
+                # CM nodes
+                cm_db_rows = [
+                    {
+                        "ts": r["ts"], "tenor_code": r["tenor_code"], "tenor_days": r["tenor_days"],
+                        "atm_iv": r.get("atm_iv"), "iv_25c": r.get("iv_25c"), "iv_25p": r.get("iv_25p"),
+                        "iv_10c": r.get("iv_10c"), "iv_10p": r.get("iv_10p"),
+                        "rr25": r.get("rr25"), "bf25": r.get("bf25"),
+                        "quality": r.get("quality", "interpolated"),
+                        "bracket_expiries": [],
+                    }
+                    for r in all_cm_rows
+                ]
+                db.upsert_cm_nodes(cm_db_rows, source_mode="backfill")
+
+                # Metric series (level + flow)
+                metric_db_rows = [
+                    {
+                        "ts": r["ts"], "metric_key": r["metric_key"],
+                        "tenor_code": r.get("tenor_code"), "window_code": r.get("window_code"),
+                        "value": r.get("value"), "percentile": r.get("percentile"),
+                        "provisional": True,
+                    }
+                    for r in all_level_rows + all_flow_rows
+                ]
+                # Score rows
+                for r in all_score_rows:
+                    if r.get("state_score") is not None:
+                        metric_db_rows.append({
+                            "ts": r["ts"], "metric_key": "state_score",
+                            "tenor_code": None, "window_code": None,
+                            "value": r["state_score"], "percentile": None,
+                            "provisional": True,
+                        })
+                    if r.get("stress_score") is not None:
+                        metric_db_rows.append({
+                            "ts": r["ts"], "metric_key": "stress_score",
+                            "tenor_code": None, "window_code": None,
+                            "value": r["stress_score"], "percentile": None,
+                            "provisional": True,
+                        })
+                db.upsert_metric_series(metric_db_rows, source_mode="backfill")
+
+                # Surface cells (last minute only)
+                last_surface = [r for r in all_surface_rows if r["ts"] == minutes[-1]]
+                if not last_surface:
+                    last_surface = all_surface_rows[-15:]  # last 15 = 3 tenors × 5 buckets
+                db.upsert_surface_cells([
+                    {"tenor_code": r["tenor_code"], "delta_bucket": r["delta_bucket"],
+                     "as_of": r["ts"], "iv": r.get("iv"), "quality_score": r.get("quality_score", 0)}
+                    for r in last_surface
+                ])
+
+                # Dashboard (last minute)
+                last_score = all_score_rows[-1] if all_score_rows else {}
+                dashboard_payload = generate_dashboard_payload(
+                    result["ts"], last_score.get("state_score"), last_score.get("stress_score"),
+                    result["level_dict"], result["level_pcts"], result["flow_dict"],
+                )
+                db.upsert_dashboard(dashboard_payload)
+
+                db.commit()
+            log.info("Persisted to Supabase (backfill, %d minutes)", minutes_with_data)
+        except Exception as exc:
+            log.warning("DB persist failed: %s", exc)
 
     # Write CSVs
     out_dir = settings.artifacts_dir / ("verify_history_%s" % target_date.isoformat())

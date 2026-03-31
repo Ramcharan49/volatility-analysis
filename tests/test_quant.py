@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timedelta
-from phase0.quant import black76_price, cleaned_option_price, compute_expiry_node, compute_expiry_nodes, implied_volatility
+from phase0.quant import black76_price, cleaned_option_price, compute_expiry_node, compute_expiry_nodes, implied_volatility, interpolate_iv_by_delta
 from phase0.time_utils import indian_timezone
 
 
@@ -71,11 +71,11 @@ class QuantTests(unittest.TestCase):
             "rr_bf_quality",
             "used_ltp_fallback",
             "bracketed_25d",
-            "bracketed_10d",
-            "wing_10_quality",
             "stress_window",
         }
         self.assertEqual(set(node.method_json.keys()), expected_keys)
+        self.assertIsNone(node.iv_10c)
+        self.assertIsNone(node.iv_10p)
         self.assertEqual(node.method_json["pricing_model"], "black_76")
         self.assertEqual(node.method_json["delta_convention"], "forward")
         self.assertEqual(node.method_json["forward_source"], "parity")
@@ -179,6 +179,74 @@ class QuantTests(unittest.TestCase):
         )
         for node in nodes:
             self.assertIsNone(node.atm_iv)
+
+
+    def test_strike_step_filtering(self):
+        """strike_step=1000 should exclude intermediate strikes."""
+        snapshot_ts = datetime(2026, 3, 16, 10, 0, tzinfo=IST)
+        expiry = (snapshot_ts + timedelta(days=30)).date()
+        forward = 22000.0
+        rate = 0.06
+        sigma = 0.2
+        # Mix of 1000-pt and 500-pt strikes
+        all_strikes = [21000.0, 21500.0, 22000.0, 22500.0, 23000.0]
+
+        option_rows = []
+        for strike in all_strikes:
+            for option_type in ("CE", "PE"):
+                price = black76_price(option_type, forward, strike, 30.0 / 365.0, rate, sigma)
+                option_rows.append({
+                    "expiry": expiry, "strike": strike, "option_type": option_type,
+                    "bid": round(price * 0.995, 4), "ask": round(price * 1.005, 4),
+                    "ltp": round(price, 4), "volume": 1000, "oi": 2000,
+                    "quote_quality": "valid_mid",
+                })
+
+        node_all = compute_expiry_node(
+            option_rows, expiry, snapshot_ts, forward, forward, rate,
+        )
+        node_filtered = compute_expiry_node(
+            option_rows, expiry, snapshot_ts, forward, forward, rate,
+            strike_step=1000.0,
+        )
+
+        self.assertIsNotNone(node_all)
+        self.assertIsNotNone(node_filtered)
+        # Filtered node should use fewer source options (only 1000-pt strikes)
+        self.assertLess(node_filtered.source_count, node_all.source_count)
+
+    def test_interpolate_iv_by_delta_put_skew(self):
+        """For puts with typical equity skew, iv_25p should be > ATM."""
+        # Simulate puts where deeper OTM (lower |delta|) have higher IV
+        puts = [
+            {"delta": -0.10, "iv": 0.35},
+            {"delta": -0.20, "iv": 0.30},
+            {"delta": -0.30, "iv": 0.25},
+            {"delta": -0.40, "iv": 0.22},
+            {"delta": -0.50, "iv": 0.20},
+        ]
+        iv_25p, bracketed = interpolate_iv_by_delta(puts, 0.25, use_abs_delta=True)
+        self.assertIsNotNone(iv_25p)
+        self.assertTrue(bracketed)
+        # 25-delta put IV should be between 0.25 and 0.30 (between |0.20| and |0.30|)
+        self.assertGreater(iv_25p, 0.25)
+        self.assertLess(iv_25p, 0.30)
+
+    def test_interpolate_iv_by_delta_call_side(self):
+        """For calls, interpolation at 0.25 delta should work correctly."""
+        calls = [
+            {"delta": 0.10, "iv": 0.28},
+            {"delta": 0.20, "iv": 0.24},
+            {"delta": 0.30, "iv": 0.21},
+            {"delta": 0.40, "iv": 0.19},
+            {"delta": 0.50, "iv": 0.18},
+        ]
+        iv_25c, bracketed = interpolate_iv_by_delta(calls, 0.25, use_abs_delta=False)
+        self.assertIsNotNone(iv_25c)
+        self.assertTrue(bracketed)
+        # 25-delta call IV between 0.21 and 0.24
+        self.assertGreater(iv_25c, 0.21)
+        self.assertLess(iv_25c, 0.24)
 
 
 if __name__ == "__main__":

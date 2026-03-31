@@ -24,20 +24,15 @@ TS = datetime(2026, 3, 16, 10, 0, tzinfo=IST)
 
 def _make_cm(tenor_code: str, tenor_days: int, atm_iv: float,
              iv_25c: float = None, iv_25p: float = None,
-             iv_10c: float = None, iv_10p: float = None,
              quality: str = "interpolated") -> ConstantMaturityNode:
     if iv_25c is None:
         iv_25c = atm_iv - 0.01
     if iv_25p is None:
         iv_25p = atm_iv + 0.02
-    if iv_10c is None:
-        iv_10c = atm_iv - 0.02
-    if iv_10p is None:
-        iv_10p = atm_iv + 0.04
     return ConstantMaturityNode(
         ts=TS, tenor_code=tenor_code, tenor_days=tenor_days,
         atm_iv=atm_iv, iv_25c=iv_25c, iv_25p=iv_25p,
-        iv_10c=iv_10c, iv_10p=iv_10p,
+        iv_10c=None, iv_10p=None,
         rr25=iv_25c - iv_25p,
         bf25=0.5 * (iv_25c + iv_25p) - atm_iv,
         quality=quality,
@@ -169,9 +164,9 @@ class TestSurfaceGrid(unittest.TestCase):
             _make_cm("90d", 90, 0.18),
         ]
 
-    def test_returns_15_cells(self):
+    def test_returns_9_cells(self):
         cells = compute_surface_grid(self.cm_nodes, TS)
-        self.assertEqual(len(cells), 15)
+        self.assertEqual(len(cells), 9)
 
     def test_all_tenor_delta_combinations(self):
         cells = compute_surface_grid(self.cm_nodes, TS)
@@ -187,11 +182,10 @@ class TestSurfaceGrid(unittest.TestCase):
         self.assertAlmostEqual(atm_cells["90d"].iv, 0.18)
 
     def test_put_skew_ordering(self):
-        """P10 > P25 > ATM (typical equity put skew)."""
+        """P25 > ATM (typical equity put skew)."""
         cells = compute_surface_grid(self.cm_nodes, TS)
         for tenor in TENOR_CODES:
             tenor_cells = {c.delta_bucket: c for c in cells if c.tenor_code == tenor}
-            self.assertGreater(tenor_cells["P10"].iv, tenor_cells["P25"].iv)
             self.assertGreater(tenor_cells["P25"].iv, tenor_cells["ATM"].iv)
 
     def test_quality_score_interpolated(self):

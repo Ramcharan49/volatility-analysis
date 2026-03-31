@@ -19,17 +19,22 @@ MIN_DTE_FOR_INTERPOLATION = 0.5  # Exclude near-expiry nodes with unreliable IV
 def interpolate_constant_maturity(
     expiry_nodes: List[ExpiryNode],
     target_tenors: Sequence[int] = DEFAULT_TENORS,
+    min_quality_score: float = 0.4,
 ) -> List[ConstantMaturityNode]:
     """Interpolate per-expiry nodes to fixed tenors in total-variance space.
 
     Returns one ConstantMaturityNode per target tenor. Nodes with
-    dte_days < MIN_DTE_FOR_INTERPOLATION are excluded (IV unreliable near expiry).
+    dte_days < MIN_DTE_FOR_INTERPOLATION or quality_score below the threshold
+    are excluded.
     """
-    # Filter out near-expiry nodes and nodes without ATM IV
-    usable = [
+    base_filter = [
         node for node in expiry_nodes
         if node.dte_days >= MIN_DTE_FOR_INTERPOLATION and node.atm_iv is not None
     ]
+    usable = [n for n in base_filter if n.quality_score >= min_quality_score]
+    # Graceful fallback: if quality gate removes everything, relax threshold
+    if not usable and base_filter:
+        usable = [n for n in base_filter if n.quality_score >= min_quality_score / 2.0]
     usable.sort(key=lambda n: n.dte_days)
 
     if not usable:
@@ -64,8 +69,8 @@ def _interpolate_single_tenor(
             atm_iv=node.atm_iv,
             iv_25c=node.iv_25c,
             iv_25p=node.iv_25p,
-            iv_10c=node.iv_10c,
-            iv_10p=node.iv_10p,
+            iv_10c=None,
+            iv_10p=None,
             rr25=node.rr25,
             bf25=node.bf25,
             quality="single_expiry",
@@ -92,8 +97,8 @@ def _interpolate_single_tenor(
             atm_iv=vol_fields.get("atm_iv"),
             iv_25c=vol_fields.get("iv_25c"),
             iv_25p=vol_fields.get("iv_25p"),
-            iv_10c=vol_fields.get("iv_10c"),
-            iv_10p=vol_fields.get("iv_10p"),
+            iv_10c=None,
+            iv_10p=None,
             rr25=rr25,
             bf25=bf25,
             quality="interpolated",
@@ -109,8 +114,8 @@ def _interpolate_single_tenor(
         atm_iv=nearest.atm_iv,
         iv_25c=nearest.iv_25c,
         iv_25p=nearest.iv_25p,
-        iv_10c=nearest.iv_10c,
-        iv_10p=nearest.iv_10p,
+        iv_10c=None,
+        iv_10p=None,
         rr25=nearest.rr25,
         bf25=nearest.bf25,
         quality="extrapolated",
@@ -125,7 +130,7 @@ def _interpolate_vol_fields(
 ) -> Dict[str, Optional[float]]:
     """Interpolate all vol fields in total-variance space."""
     result: Dict[str, Optional[float]] = {}
-    for field_name in ("atm_iv", "iv_25c", "iv_25p", "iv_10c", "iv_10p"):
+    for field_name in ("atm_iv", "iv_25c", "iv_25p"):
         left_iv = getattr(left, field_name)
         right_iv = getattr(right, field_name)
         result[field_name] = _total_variance_interp(

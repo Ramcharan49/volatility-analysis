@@ -27,8 +27,8 @@ def _make_node(dte_days: float, atm_iv: float = 0.20, **kwargs) -> ExpiryNode:
         atm_iv=atm_iv,
         iv_25c=kwargs.get("iv_25c", atm_iv - 0.01),
         iv_25p=kwargs.get("iv_25p", atm_iv + 0.02),
-        iv_10c=kwargs.get("iv_10c", atm_iv - 0.02),
-        iv_10p=kwargs.get("iv_10p", atm_iv + 0.04),
+        iv_10c=None,
+        iv_10p=None,
         rr25=kwargs.get("rr25"),
         bf25=kwargs.get("bf25"),
         source_count=50,
@@ -198,6 +198,49 @@ class TestInterpolateConstantMaturity(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0].tenor_days, 14)
         self.assertEqual(result[1].tenor_days, 45)
+
+    def test_quality_gate_filters_low_quality(self):
+        """Nodes with quality_score below threshold are excluded from brackets."""
+        low_q = _make_node(dte_days=14.0, atm_iv=0.50)
+        low_q = ExpiryNode(
+            ts=TS, expiry=date(2026, 4, 1), dte_days=14.0,
+            forward=22000.0, atm_strike=22000.0, atm_iv=0.50,
+            iv_25c=0.48, iv_25p=0.55,
+            source_count=2, quality_score=0.1,
+        )
+        good = _make_node(dte_days=45.0, atm_iv=0.20)
+        result = interpolate_constant_maturity([low_q, good], target_tenors=[30])
+        # Low-quality node excluded → only one usable → single_expiry
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].quality, "single_expiry")
+        # ATM IV should come from good node (0.20), not polluted by low_q (0.50)
+        self.assertAlmostEqual(result[0].atm_iv, 0.20, places=6)
+
+    def test_quality_gate_fallback(self):
+        """If all nodes fail primary threshold, halved threshold is tried."""
+        mid_q = ExpiryNode(
+            ts=TS, expiry=date(2026, 4, 1), dte_days=14.0,
+            forward=22000.0, atm_strike=22000.0, atm_iv=0.22,
+            iv_25c=0.21, iv_25p=0.24,
+            source_count=10, quality_score=0.3,
+        )
+        result = interpolate_constant_maturity(
+            [mid_q], target_tenors=[7], min_quality_score=0.5,
+        )
+        # 0.3 < 0.5 but 0.3 >= 0.25 (half of 0.5), so fallback should work
+        self.assertEqual(len(result), 1)
+        self.assertAlmostEqual(result[0].atm_iv, 0.22, places=6)
+
+    def test_iv_10_always_none_in_cm(self):
+        """CM nodes should always have iv_10c=None and iv_10p=None."""
+        nodes = [
+            _make_node(dte_days=14.0, atm_iv=0.22),
+            _make_node(dte_days=45.0, atm_iv=0.18),
+        ]
+        result = interpolate_constant_maturity(nodes)
+        for cm in result:
+            self.assertIsNone(cm.iv_10c)
+            self.assertIsNone(cm.iv_10p)
 
 
 if __name__ == "__main__":

@@ -24,13 +24,15 @@ class SealedMinuteResult:
 
 
 class MinuteAccumulator:
-    def __init__(self, universe: Sequence[ProbeUniverseItem], rate: float, allow_ltp_fallback: bool = False):
+    def __init__(self, universe: Sequence[ProbeUniverseItem], rate: float,
+                 allow_ltp_fallback: bool = False, strike_step: Optional[float] = None):
         self.universe = list(universe)
         self.items_by_key = {
             item.instrument_key: item for item in self.universe if item.instrument_key is not None
         }
         self.rate = rate
         self.allow_ltp_fallback = allow_ltp_fallback
+        self.strike_step = strike_step
         self.minute_buckets: Dict[datetime, Dict[str, Dict]] = {}
         self.spot_key = next(
             (item.instrument_key for item in self.universe if item.role == "spot" and item.instrument_key is not None),
@@ -107,6 +109,7 @@ class MinuteAccumulator:
             spot_price=spot_price,
             rate=self.rate,
             allow_ltp_fallback=self.allow_ltp_fallback,
+            strike_step=self.strike_step,
         )
 
         return SealedMinuteResult(

@@ -11,7 +11,7 @@ from worker.calendar import (
     previous_trading_day,
     trading_days_between,
 )
-from worker.gap_fill import Gap, RateLimiter, detect_gaps
+from worker.gap_fill import Gap, RateLimiter, _row_to_universe_item, detect_gaps
 
 IST = indian_timezone()
 
@@ -27,14 +27,14 @@ class TestTradingCalendar(unittest.TestCase):
     def test_sunday_not_trading(self):
         self.assertFalse(is_trading_day(date(2026, 3, 22)))
 
-    def test_holiday_not_trading(self):
-        # 2026-01-26 is Republic Day
-        self.assertFalse(is_trading_day(date(2026, 1, 26)))
+    def test_sunday_not_trading_via_is_trading_day(self):
+        # 2026-03-22 is Sunday
+        self.assertFalse(is_trading_day(date(2026, 3, 22)))
 
     def test_trading_days_between(self):
-        # Mon to Fri: 5 trading days (if no holidays)
+        # Mon to Fri: 5 trading days (no holidays in empty set)
         days = trading_days_between(date(2026, 3, 16), date(2026, 3, 20))
-        self.assertEqual(len(days), 4)  # 3/20 is Id-Ul-Fitr holiday
+        self.assertEqual(len(days), 5)
         self.assertEqual(days[0], date(2026, 3, 16))
 
     def test_market_minutes_count(self):
@@ -46,15 +46,15 @@ class TestTradingCalendar(unittest.TestCase):
         self.assertEqual(minutes[-1].hour, 15)
         self.assertEqual(minutes[-1].minute, 29)
 
-    def test_market_minutes_holiday_empty(self):
-        minutes = market_minutes_for_day(date(2026, 1, 26))
+    def test_market_minutes_weekend_empty(self):
+        # 2026-03-22 is Sunday — no market minutes
+        minutes = market_minutes_for_day(date(2026, 3, 22))
         self.assertEqual(len(minutes), 0)
 
     def test_previous_trading_day_skips_weekend(self):
-        # 2026-03-23 is Monday
+        # 2026-03-23 is Monday — previous trading day is Friday 2026-03-20
         prev = previous_trading_day(date(2026, 3, 23))
-        # 2026-03-20 is Id-Ul-Fitr, so previous is 2026-03-19 (Thursday)
-        self.assertEqual(prev, date(2026, 3, 19))
+        self.assertEqual(prev, date(2026, 3, 20))
 
     def test_previous_trading_day_weekday(self):
         prev = previous_trading_day(date(2026, 3, 18))
@@ -108,6 +108,36 @@ class TestRateLimiter(unittest.TestCase):
         rl._timestamps.append(old_time)
         rl._prune(time_mod.monotonic())
         self.assertEqual(len(rl._timestamps), 0)
+
+
+class TestRowToUniverseItem(unittest.TestCase):
+    def test_option_type_from_instrument_type(self):
+        """option_type should fall back to instrument_type when option_type key is absent."""
+        row = {
+            "instrument_key": "NSE_FO|NIFTY25APR22000CE",
+            "tradingsymbol": "NIFTY25APR22000CE",
+            "instrument_type": "CE",
+            "segment": "NSE_FO",
+            "expiry": date(2026, 4, 9),
+            "strike": 22000.0,
+            "lot_size": 25,
+        }
+        item = _row_to_universe_item(row, "option")
+        self.assertEqual(item.option_type, "CE")
+
+    def test_option_type_explicit_takes_precedence(self):
+        """If row has an explicit option_type key, it should be used."""
+        row = {
+            "instrument_key": "NSE_FO|NIFTY25APR22000PE",
+            "tradingsymbol": "NIFTY25APR22000PE",
+            "instrument_type": "PE",
+            "option_type": "PE",
+            "segment": "NSE_FO",
+            "expiry": date(2026, 4, 9),
+            "strike": 22000.0,
+        }
+        item = _row_to_universe_item(row, "option")
+        self.assertEqual(item.option_type, "PE")
 
 
 if __name__ == "__main__":

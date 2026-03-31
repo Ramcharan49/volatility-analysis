@@ -352,6 +352,7 @@ class Worker:
             accumulator = MinuteAccumulator(
                 universe, self.settings.risk_free_rate,
                 allow_ltp_fallback=self.settings.allow_ltp_fallback,
+                strike_step=self.settings.strike_step,
             )
 
             def on_ticks(ws, ticks):
@@ -582,6 +583,7 @@ class Worker:
                 baselines=gap_baselines,
                 flow_baselines=gap_flow_baselines,
                 prior_close=gap_prior_close,
+                strike_step=self.settings.strike_step,
             )
             log.info("Gap-fill result: %s", result)
 

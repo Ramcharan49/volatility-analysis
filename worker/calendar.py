@@ -13,45 +13,11 @@ MARKET_CLOSE = time(15, 30)
 MINUTES_PER_SESSION = 375  # 09:15 to 15:29 inclusive
 
 
-# NSE holidays for 2025 and 2026 (gazetted holidays when market is closed)
-NSE_HOLIDAYS: Set[date] = {
-    # 2025
-    date(2025, 2, 26),   # Mahashivratri
-    date(2025, 3, 14),   # Holi
-    date(2025, 3, 31),   # Id-Ul-Fitr (Ramadan)
-    date(2025, 4, 10),   # Shri Mahavir Jayanti
-    date(2025, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti
-    date(2025, 4, 18),   # Good Friday
-    date(2025, 5, 1),    # Maharashtra Day
-    date(2025, 6, 7),    # Bakri Id
-    date(2025, 8, 15),   # Independence Day
-    date(2025, 8, 16),   # Janmashtami
-    date(2025, 10, 2),   # Mahatma Gandhi Jayanti
-    date(2025, 10, 21),  # Diwali (Laxmi Pujan)
-    date(2025, 10, 22),  # Diwali Balipratipada
-    date(2025, 11, 5),   # Prakash Gurpurb Sri Guru Nanak Dev
-    date(2025, 12, 25),  # Christmas
-    # 2026
-    date(2026, 1, 26),   # Republic Day
-    date(2026, 2, 17),   # Mahashivratri
-    date(2026, 3, 3),    # Holi
-    date(2026, 3, 20),   # Id-Ul-Fitr
-    date(2026, 3, 30),   # Shri Ram Navmi
-    date(2026, 4, 3),    # Good Friday
-    date(2026, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti
-    date(2026, 5, 1),    # Maharashtra Day
-    date(2026, 5, 25),   # Buddha Purnima
-    date(2026, 5, 28),   # Bakri Id
-    date(2026, 6, 26),   # Muharram
-    date(2026, 8, 15),   # Independence Day
-    date(2026, 8, 25),   # Milad-Un-Nabi
-    date(2026, 10, 2),   # Mahatma Gandhi Jayanti
-    date(2026, 10, 9),   # Dussehra
-    date(2026, 10, 29),  # Diwali (Laxmi Pujan)
-    date(2026, 10, 30),  # Diwali Balipratipada
-    date(2026, 11, 16),  # Guru Nanak Jayanti
-    date(2026, 12, 25),  # Christmas
-}
+# NSE holidays — left empty intentionally. If history mode or gap-fill
+# hits a holiday, the API simply returns no candle data and it's handled
+# gracefully. Populate from official NSE circulars if you want to skip
+# unnecessary API calls on holidays.
+NSE_HOLIDAYS: Set[date] = set()
 
 
 def is_trading_day(d: date) -> bool:

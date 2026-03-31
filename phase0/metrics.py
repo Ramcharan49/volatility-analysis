@@ -33,7 +33,7 @@ FLOW_METRIC_KEYS = [
     for window in FLOW_WINDOWS
 ]
 
-DELTA_BUCKETS = ["P10", "P25", "ATM", "C25", "C10"]
+DELTA_BUCKETS = ["P25", "ATM", "C25"]
 
 
 # ── Data structures ──────────────────────────────────────────────────
@@ -147,9 +147,9 @@ def compute_surface_grid(
     cm_nodes: List[ConstantMaturityNode],
     ts: datetime,
 ) -> List[SurfaceCell]:
-    """Compute the 5x3 surface grid from constant-maturity nodes.
+    """Compute the 3x3 surface grid from constant-maturity nodes.
 
-    Delta buckets: P10, P25, ATM, C25, C10
+    Delta buckets: P25, ATM, C25
     Tenors: 7d, 30d, 90d
     """
     by_tenor: Dict[str, ConstantMaturityNode] = {}
@@ -157,11 +157,9 @@ def compute_surface_grid(
         by_tenor[node.tenor_code] = node
 
     _field_map = {
-        "P10": "iv_10p",
         "P25": "iv_25p",
         "ATM": "atm_iv",
         "C25": "iv_25c",
-        "C10": "iv_10c",
     }
 
     cells: List[SurfaceCell] = []

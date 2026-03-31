@@ -356,7 +356,7 @@ def _row_to_universe_item(row: Dict, role: str) -> ProbeUniverseItem:
         instrument_type=row.get("instrument_type"),
         expiry=expiry,
         strike=float(strike_val) if strike_val else None,
-        option_type=row.get("option_type"),
+        option_type=row.get("option_type") or row.get("instrument_type"),
         lot_size=int(row["lot_size"]) if row.get("lot_size") else None,
     )
 
@@ -373,6 +373,7 @@ def backfill_day(
     baselines: Optional[Dict[str, List[float]]] = None,
     flow_baselines: Optional[Dict[str, List[float]]] = None,
     prior_close: Optional[Dict[str, Optional[float]]] = None,
+    strike_step: Optional[float] = None,
 ) -> Dict:
     """Backfill one gap day using historical candles.
 
@@ -530,6 +531,7 @@ def _backfill_day_inner(
             spot_price=spot_price,
             rate=rate,
             allow_ltp_fallback=True,  # Always True for backfill
+            strike_step=strike_step,
         )
 
         if expiry_nodes and db is not None:

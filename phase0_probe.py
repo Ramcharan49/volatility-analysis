@@ -174,6 +174,7 @@ def run_probe(settings, args) -> int:
             spot_price=spot_ltp,
             rate=settings.risk_free_rate,
             allow_ltp_fallback=allow_ltp,
+            strike_step=settings.strike_step,
         )
         expiry_node_rows = [asdict(node) for node in expiry_nodes]
         artifact_paths["expiry_nodes"] = _artifact_ref(
@@ -286,7 +287,7 @@ def run_live(settings, args) -> int:
         artifact_paths["sealed_options"] = _artifact_ref(sealed_options_path)
         artifact_paths["sealed_expiry_nodes"] = _artifact_ref(sealed_nodes_path)
 
-        accumulator = MinuteAccumulator(universe, settings.risk_free_rate, allow_ltp_fallback=allow_ltp)
+        accumulator = MinuteAccumulator(universe, settings.risk_free_rate, allow_ltp_fallback=allow_ltp, strike_step=settings.strike_step)
         lock = threading.Lock()
         connected = threading.Event()
         state: Dict[str, Optional[Exception]] = {"fatal": None}
@@ -444,6 +445,7 @@ def run_replay(settings, args) -> int:
             universe,
             manifest["config"].get("risk_free_rate", settings.risk_free_rate),
             allow_ltp_fallback=allow_ltp,
+            strike_step=settings.strike_step,
         )
 
         expected_underlying = read_jsonl(Path(manifest["artifact_paths"]["sealed_underlying"]))

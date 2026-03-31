@@ -12,7 +12,6 @@ from phase0.time_utils import indian_timezone
 
 IST = indian_timezone()
 TARGET_DELTA = 0.25
-TARGET_DELTA_10 = 0.10
 QUALITY_SCORE_MAP = {"high": 1.0, "medium": 0.6, "low": 0.25, "null": 0.0}
 RRBF_SCORE_MAP = {"high": 1.0, "low": 0.5, "null": 0.0}
 
@@ -97,6 +96,7 @@ def compute_expiry_nodes(
     spot_price: Optional[float],
     rate: float,
     allow_ltp_fallback: bool = False,
+    strike_step: Optional[float] = None,
 ) -> List[ExpiryNode]:
     grouped: Dict[date, List[Dict]] = defaultdict(list)
     for row in option_rows:
@@ -115,6 +115,7 @@ def compute_expiry_nodes(
             spot_price,
             rate,
             allow_ltp_fallback=allow_ltp_fallback,
+            strike_step=strike_step,
         )
         if node:
             nodes.append(node)
@@ -129,6 +130,7 @@ def compute_expiry_node(
     spot_price: Optional[float],
     rate: float,
     allow_ltp_fallback: bool = False,
+    strike_step: Optional[float] = None,
 ) -> Optional[ExpiryNode]:
     time_to_expiry = _time_to_expiry_years(expiry, snapshot_ts)
     if time_to_expiry <= 0:
@@ -182,6 +184,14 @@ def compute_expiry_node(
     if not forward or forward <= 0:
         return None
 
+    # Filter to on-grid strikes for IV/delta interpolation (keep all for parity above)
+    if strike_step is not None and strike_step > 0:
+        on_grid = {s for s in available_strikes if s % strike_step == 0}
+        cleaned = [r for r in cleaned if float(r["strike"]) in on_grid]
+        available_strikes = sorted(on_grid & set(available_strikes))
+        if not cleaned:
+            return None
+
     valid_options: List[Dict] = []
     for row in cleaned:
         sigma = implied_volatility(row["option_type"], row["clean_price"], forward, float(row["strike"]), time_to_expiry, rate)
@@ -204,18 +214,10 @@ def compute_expiry_node(
     iv_25c, call_bracketed = interpolate_iv_by_delta(calls, TARGET_DELTA, use_abs_delta=False)
     iv_25p, put_bracketed = interpolate_iv_by_delta(puts, TARGET_DELTA, use_abs_delta=True)
 
-    iv_10c, call_10_bracketed = interpolate_iv_by_delta(calls, TARGET_DELTA_10, use_abs_delta=False)
-    iv_10p, put_10_bracketed = interpolate_iv_by_delta(puts, TARGET_DELTA_10, use_abs_delta=True)
-
     rr_bf_quality = "null"
     bracketed_25d = bool(call_bracketed and put_bracketed)
-    bracketed_10d = bool(call_10_bracketed and put_10_bracketed)
     if iv_25c is not None and iv_25p is not None:
         rr_bf_quality = "high" if bracketed_25d else "low"
-
-    wing_10_quality = "null"
-    if iv_10c is not None and iv_10p is not None:
-        wing_10_quality = "high" if bracketed_10d else ("medium" if (call_10_bracketed or put_10_bracketed) else "low")
 
     rr25 = (iv_25c - iv_25p) if iv_25c is not None and iv_25p is not None else None
     bf25 = (0.5 * (iv_25c + iv_25p) - atm_iv) if iv_25c is not None and iv_25p is not None and atm_iv is not None else None
@@ -237,8 +239,8 @@ def compute_expiry_node(
         atm_iv=atm_iv,
         iv_25c=iv_25c,
         iv_25p=iv_25p,
-        iv_10c=iv_10c,
-        iv_10p=iv_10p,
+        iv_10c=None,
+        iv_10p=None,
         rr25=rr25,
         bf25=bf25,
         source_count=len(valid_options),
@@ -253,8 +255,6 @@ def compute_expiry_node(
             "rr_bf_quality": rr_bf_quality,
             "used_ltp_fallback": used_ltp_fallback,
             "bracketed_25d": bracketed_25d,
-            "bracketed_10d": bracketed_10d,
-            "wing_10_quality": wing_10_quality,
             "stress_window": "1d",
         },
     )

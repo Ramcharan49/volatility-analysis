@@ -36,6 +36,7 @@ class Settings:
     backfill_days: int = 1
     max_dte_days: int = 120
     ws_token_limit: int = 1800
+    strike_step: Optional[float] = None
 
     @property
     def spot_exchange(self) -> str:
@@ -72,6 +73,7 @@ def load_settings() -> Settings:
         store_raw_json_in_db=store_raw,
         expired_history_months=int(_clean_env("PHASE0_EXPIRED_HISTORY_MONTHS") or "6"),
         supabase_db_url=_clean_env("SUPABASE_DB_URL_SESSION"),
+        strike_step=float(_clean_env("PHASE0_STRIKE_STEP") or "0") or None,
     )
 
 
