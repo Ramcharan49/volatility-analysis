@@ -299,34 +299,36 @@ class WorkerDatabase:
                 result.setdefault(row[1], []).append({"ts": row[0], "value": row[2]})
         return result
 
-    def fetch_metric_baselines(self, lookback_days: int = 252) -> Dict[str, List[float]]:
+    def fetch_metric_baselines(self, as_of_day: date, lookback_days: int = 252) -> Dict[str, List[float]]:
         """Load daily-close baselines for percentile computation."""
         sql = """
             SELECT metric_key, close_value
             FROM analytics.metric_baselines_daily
             WHERE metric_date >= %s
+              AND metric_date < %s
             ORDER BY metric_key, metric_date
         """
-        cutoff = date.today() - timedelta(days=lookback_days)
+        cutoff = as_of_day - timedelta(days=lookback_days)
         result: Dict[str, List[float]] = {}
         with self.conn.cursor() as cur:
-            cur.execute(sql, (cutoff,))
+            cur.execute(sql, (cutoff, as_of_day))
             for row in cur.fetchall():
                 result.setdefault(row[0], []).append(float(row[1]) if row[1] is not None else None)
         return result
 
-    def fetch_flow_baselines(self, lookback_days: int = 252) -> Dict[str, List[float]]:
+    def fetch_flow_baselines(self, as_of_day: date, lookback_days: int = 252) -> Dict[str, List[float]]:
         """Load historical flow changes for flow percentile computation."""
         sql = """
             SELECT 'd_' || metric_key || '_' || window_code AS flow_key, change_value
             FROM analytics.flow_baselines
             WHERE metric_date >= %s
+              AND metric_date < %s
             ORDER BY metric_key, window_code, metric_date
         """
-        cutoff = date.today() - timedelta(days=lookback_days)
+        cutoff = as_of_day - timedelta(days=lookback_days)
         result: Dict[str, List[float]] = {}
         with self.conn.cursor() as cur:
-            cur.execute(sql, (cutoff,))
+            cur.execute(sql, (cutoff, as_of_day))
             for row in cur.fetchall():
                 result.setdefault(row[0], []).append(float(row[1]) if row[1] is not None else None)
         return result
@@ -345,6 +347,32 @@ class WorkerDatabase:
                 if row[1] is not None:
                     result[row[0]] = float(row[1])
         return result
+
+    def fetch_latest_metric_values_before_day(self, target_day: date) -> tuple[Optional[date], Dict[str, float]]:
+        """Fetch metric values from the latest stored snapshot before a given day."""
+        anchor_sql = """
+            SELECT max(ts)
+            FROM public.metric_series_1m
+            WHERE ts < %s::date
+        """
+        rows_sql = """
+            SELECT metric_key, value
+            FROM public.metric_series_1m
+            WHERE ts = %s
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(anchor_sql, (target_day,))
+            row = cur.fetchone()
+            anchor_ts = row[0] if row else None
+            if anchor_ts is None:
+                return None, {}
+
+            cur.execute(rows_sql, (anchor_ts,))
+            result: Dict[str, float] = {}
+            for metric_key, value in cur.fetchall():
+                if value is not None:
+                    result[metric_key] = float(value)
+            return anchor_ts.date(), result
 
     def fetch_last_sealed_ts(self) -> Optional[datetime]:
         """Get the most recent ts from expiry_nodes_1m."""
@@ -383,6 +411,78 @@ class WorkerDatabase:
             cur.execute(sql, (status, minutes_filled, error_message, log_id))
 
     # ── Internals ─────────────────────────────────────────────────
+
+    def insert_history_backfill_run(self, from_date: date, to_date: date,
+                                    daily_source: str, skip_db: bool) -> str:
+        """Insert a history backfill run audit row and return its UUID."""
+        sql = """
+            INSERT INTO ops.history_backfill_run (
+                from_date, to_date, daily_source, skip_db, status, started_at
+            )
+            VALUES (%s, %s, %s, %s, 'running', now())
+            RETURNING id::text
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(sql, (from_date, to_date, daily_source, skip_db))
+            row = cur.fetchone()
+            return row[0]
+
+    def upsert_history_backfill_day_log(self, run_id: str, outcome: Dict[str, Any]) -> None:
+        """Upsert one per-date history backfill audit row."""
+        sql = """
+            INSERT INTO ops.history_backfill_day_log (
+                run_id, trade_date, mode, source, status, persisted, skip_db,
+                elapsed_sec, row_counts_json, outputs_json, diagnostics_json,
+                message, artifact_path, updated_at
+            )
+            VALUES (
+                %s::uuid, %s, %s, %s, %s, %s, %s,
+                %s, %s::jsonb, %s::jsonb, %s::jsonb,
+                %s, %s, now()
+            )
+            ON CONFLICT (run_id, trade_date) DO UPDATE
+            SET mode = excluded.mode,
+                source = excluded.source,
+                status = excluded.status,
+                persisted = excluded.persisted,
+                skip_db = excluded.skip_db,
+                elapsed_sec = excluded.elapsed_sec,
+                row_counts_json = excluded.row_counts_json,
+                outputs_json = excluded.outputs_json,
+                diagnostics_json = excluded.diagnostics_json,
+                message = excluded.message,
+                artifact_path = excluded.artifact_path,
+                updated_at = now()
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(sql, (
+                run_id,
+                outcome["day"],
+                outcome["mode"],
+                outcome["source"],
+                outcome["status"],
+                outcome["persisted"],
+                outcome["skip_db"],
+                outcome["elapsed_sec"],
+                self._json(outcome.get("row_counts") or {}),
+                self._json(outcome.get("outputs") or {}),
+                self._json(outcome.get("diagnostics") or {}),
+                outcome.get("message"),
+                outcome.get("artifact_dir"),
+            ))
+
+    def update_history_backfill_run(self, run_id: str, status: str,
+                                    summary: Dict[str, Any]) -> None:
+        """Finalize a history backfill run audit row."""
+        sql = """
+            UPDATE ops.history_backfill_run
+            SET status = %s,
+                summary_json = %s::jsonb,
+                ended_at = now()
+            WHERE id = %s::uuid
+        """
+        with self.conn.cursor() as cur:
+            cur.execute(sql, (status, self._json(summary), run_id))
 
     def _execute(self, sql: str, params: Sequence) -> None:
         with self.conn.cursor() as cursor:

@@ -5,12 +5,27 @@ state/stress scores, and regime quadrant classification.
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 
 # Minimum days of baseline data for percentile computation
 MIN_DAYS_FOR_PERCENTILE = 5
 MIN_DAYS_FOR_RELIABLE = 60
+
+STATE_SCORE_LEVEL_KEYS = (
+    "atm_iv_7d",
+    "atm_iv_30d",
+    "front_end_dominance",
+    "rr25_30d",
+    "bf25_30d",
+)
+
+STRESS_SCORE_FLOW_KEYS = (
+    "d_atm_iv_7d_1d",
+    "d_rr25_30d_1d",
+    "d_bf25_30d_1d",
+    "d_front_end_dominance_1d",
+)
 
 
 def empirical_percentile(value: float, history: List[float]) -> Optional[float]:
@@ -28,6 +43,26 @@ def empirical_percentile(value: float, history: List[float]) -> Optional[float]:
 def is_provisional(history_length: int) -> bool:
     """Determine if percentile is provisional (insufficient history)."""
     return history_length < MIN_DAYS_FOR_RELIABLE
+
+
+def metric_history_is_provisional(
+    histories: Optional[Dict[str, List[float]]],
+    metric_key: str,
+) -> bool:
+    """Determine whether a single metric's history is still in warm-up."""
+    if histories is None:
+        return True
+    return len(histories.get(metric_key, [])) < MIN_DAYS_FOR_RELIABLE
+
+
+def score_history_is_provisional(
+    histories: Optional[Dict[str, List[float]]],
+    required_keys: Iterable[str],
+) -> bool:
+    """Determine whether all score-driving histories are reliable yet."""
+    if histories is None:
+        return True
+    return any(metric_history_is_provisional(histories, key) for key in required_keys)
 
 
 # ── Level percentiles ────────────────────────────────────────────────

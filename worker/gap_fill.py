@@ -44,45 +44,39 @@ class RateLimiter:
         self.per_min = per_min
         self.per_30min = per_30min
         self._timestamps: deque = deque()
+        self._sec_timestamps: deque = deque()
+        self._min_timestamps: deque = deque()
 
     def wait_if_needed(self) -> None:
         """Block until it's safe to make another request."""
-        now = time_mod.monotonic()
-        self._prune(now)
-
-        # Check 30-minute window (binding)
-        if len(self._timestamps) >= self.per_30min:
-            oldest = self._timestamps[0]
-            wait = oldest + 1800 - now
-            if wait > 0:
-                log.debug("Rate limit: waiting %.1fs (30min window)", wait)
-                time_mod.sleep(wait)
-                now = time_mod.monotonic()
-                self._prune(now)
-
-        # Check 1-minute window
-        one_min_ago = now - 60
-        recent_min = sum(1 for t in self._timestamps if t > one_min_ago)
-        if recent_min >= self.per_min:
-            oldest_min = next(t for t in self._timestamps if t > one_min_ago)
-            wait = oldest_min + 60 - now
-            if wait > 0:
-                log.debug("Rate limit: waiting %.1fs (1min window)", wait)
-                time_mod.sleep(wait)
-                now = time_mod.monotonic()
-
-        # Check 1-second window
-        one_sec_ago = now - 1
-        recent_sec = sum(1 for t in self._timestamps if t > one_sec_ago)
-        if recent_sec >= self.per_sec:
-            time_mod.sleep(0.05)
+        while True:
             now = time_mod.monotonic()
+            self._prune(now)
 
-        self._timestamps.append(now)
+            waits = []
+            if len(self._sec_timestamps) >= self.per_sec:
+                waits.append(self._sec_timestamps[0] + 1 - now)
+            if len(self._min_timestamps) >= self.per_min:
+                waits.append(self._min_timestamps[0] + 60 - now)
+            if len(self._timestamps) >= self.per_30min:
+                waits.append(self._timestamps[0] + 1800 - now)
+
+            wait = max((value for value in waits if value > 0), default=0.0)
+            if wait <= 0:
+                self._sec_timestamps.append(now)
+                self._min_timestamps.append(now)
+                self._timestamps.append(now)
+                return
+
+            log.debug("Rate limit: waiting %.3fs", wait)
+            time_mod.sleep(wait)
 
     def _prune(self, now: float) -> None:
-        cutoff = now - 1800  # 30 minutes
-        while self._timestamps and self._timestamps[0] < cutoff:
+        while self._sec_timestamps and self._sec_timestamps[0] <= now - 1:
+            self._sec_timestamps.popleft()
+        while self._min_timestamps and self._min_timestamps[0] <= now - 60:
+            self._min_timestamps.popleft()
+        while self._timestamps and self._timestamps[0] <= now - 1800:
             self._timestamps.popleft()
 
 
@@ -302,8 +296,23 @@ def build_historical_universe(
     except Exception:
         gap_spot = None
 
-    if gap_spot is not None:
-        # Keep options within 80-120% moneyness of gap-date spot
+    if gap_spot is not None and settings.strike_step and settings.strikes_around_atm > 0:
+        # Filter to ±N grid-aligned strikes around ATM
+        step = settings.strike_step
+        atm_strike = round(gap_spot / step) * step
+        n = settings.strikes_around_atm
+        allowed = {atm_strike + i * step for i in range(-n, n + 1)}
+        before = sum(1 for i in universe if i.role == "option")
+        universe = [
+            item for item in universe
+            if item.role != "option" or item.strike is None
+            or item.strike in allowed
+        ]
+        after = sum(1 for i in universe if i.role == "option")
+        log.info("  Strike filter: ±%d strikes around ATM %.0f → %d/%d options kept",
+                 n, atm_strike, after, before)
+    elif gap_spot is not None:
+        # Fallback to moneyness filter
         min_strike = gap_spot * 0.80
         max_strike = gap_spot * 1.20
         universe = [
@@ -402,6 +411,7 @@ def backfill_day(
             gap, universe, client, rate, rate_limiter, db,
             baselines=baselines, flow_baselines=flow_baselines,
             prior_close=prior_close or {},
+            strike_step=strike_step,
         )
         minutes_filled = result["minutes_filled"]
 
@@ -434,6 +444,7 @@ def _backfill_day_inner(
     baselines: Optional[Dict[str, List[float]]] = None,
     flow_baselines: Optional[Dict[str, List[float]]] = None,
     prior_close: Optional[Dict[str, Optional[float]]] = None,
+    strike_step: Optional[float] = None,
 ) -> Dict:
     """Inner backfill logic extracted for gap_fill_log wrapping."""
     from phase0.providers.upstox.history import (
@@ -502,10 +513,14 @@ def _backfill_day_inner(
     )
     from worker.buffers import FlowRingBuffer
     from worker.percentile import (
+        STATE_SCORE_LEVEL_KEYS,
+        STRESS_SCORE_FLOW_KEYS,
         compute_abs_flow_percentiles,
         compute_level_percentiles,
         compute_state_score,
         compute_stress_score,
+        metric_history_is_provisional,
+        score_history_is_provisional,
     )
 
     minutes = market_minutes_for_day(day)
@@ -588,14 +603,16 @@ def _backfill_day_inner(
                     "tenor_code": p.tenor_code, "window_code": p.window_code,
                     "value": p.value,
                     "percentile": level_pcts.get(p.metric_key),
-                    "provisional": True,
+                    "provisional": metric_history_is_provisional(baselines, p.metric_key),
                 }
                 for p in level_points
             ] + [
                 {
                     "ts": p.ts, "metric_key": p.metric_key,
                     "tenor_code": p.tenor_code, "window_code": p.window_code,
-                    "value": p.value, "percentile": None, "provisional": True,
+                    "value": p.value,
+                    "percentile": None,
+                    "provisional": metric_history_is_provisional(flow_baselines, p.metric_key),
                 }
                 for p in flow_points
             ]
@@ -603,13 +620,17 @@ def _backfill_day_inner(
                 metric_rows.append({
                     "ts": minute_ts, "metric_key": "state_score",
                     "tenor_code": None, "window_code": None,
-                    "value": state_score, "percentile": None, "provisional": True,
+                    "value": state_score,
+                    "percentile": None,
+                    "provisional": score_history_is_provisional(baselines, STATE_SCORE_LEVEL_KEYS),
                 })
             if stress_score is not None:
                 metric_rows.append({
                     "ts": minute_ts, "metric_key": "stress_score",
                     "tenor_code": None, "window_code": None,
-                    "value": stress_score, "percentile": None, "provisional": True,
+                    "value": stress_score,
+                    "percentile": None,
+                    "provisional": score_history_is_provisional(flow_baselines, STRESS_SCORE_FLOW_KEYS),
                 })
             db.upsert_metric_series(metric_rows, source_mode="historical_backfill")
 

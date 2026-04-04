@@ -4,7 +4,7 @@ Real-time volatility surface analytics for NIFTY 50 index options. Transforms ra
 
 ## Overview
 
-This system ingests live and historical NIFTY options data via the Upstox API, computes implied volatility across the strike/expiry grid, interpolates to constant-maturity tenors (7D, 30D, 90D), and derives level metrics (ATM IV, risk reversal, butterfly), flow metrics (rate-of-change across multiple windows), percentile context, and a composite regime score.
+This system ingests live NIFTY options data via Upstox and daily historical close data via either Upstox or public NSE UDiFF FO bhavcopies, computes implied volatility across the strike/expiry grid, interpolates to constant-maturity tenors (7D, 30D, 90D), and derives level metrics (ATM IV, risk reversal, butterfly), flow metrics (rate-of-change across multiple windows), percentile context, and a composite regime score.
 
 The output is a structured analytics layer suitable for powering dashboards, alerts, and trading decision support.
 
@@ -24,36 +24,42 @@ The output is a structured analytics layer suitable for powering dashboards, ale
 ## Architecture
 
 ```
-Upstox API
-    |
-    v
-[Instruments Sync] --> [Universe Builder] --> [Quote Fetcher / WebSocket]
-                                                     |
-                                                     v
-                                          [Option Price Cleaning]
-                                                     |
-                                                     v
-                                        [Put-Call Parity Forward]
-                                                     |
-                                                     v
-                                     [Black-76 IV Solver + Delta]
-                                                     |
-                                                     v
-                                           [Expiry Nodes]
-                                          (per-expiry vol surface)
-                                                     |
-                                                     v
-                                    [Constant-Maturity Interpolation]
-                                     (total-variance space, 7D/30D/90D)
-                                                     |
-                                                     v
-                              [Level Metrics]   [Surface Grid]   [Flow Metrics]
-                                      |               |               |
-                                      v               v               v
-                              [Percentile Engine] --> [Regime Scores] --> [Daily Brief]
-                                                                              |
-                                                                              v
-                                                                        [Supabase DB]
+Upstox API                           NSE UDiFF Daily Files
+    |                                       |
+    v                                       v
+[Instruments Sync] --> [Universe Builder]   [Daily History Source]
+                 \            |                    |
+                  \           v                    |
+                   --> [Quote Fetcher / WebSocket]|
+                                 |                |
+                                 v                v
+                        [Normalized Option Rows / Underlyings]
+                                         |
+                                         v
+                              [Option Price Cleaning]
+                                         |
+                                         v
+                            [Put-Call Parity Forward]
+                                         |
+                                         v
+                         [Black-76 IV Solver + Delta]
+                                         |
+                                         v
+                               [Expiry Nodes]
+                              (per-expiry vol surface)
+                                         |
+                                         v
+                        [Constant-Maturity Interpolation]
+                         (total-variance space, 7D/30D/90D)
+                                         |
+                                         v
+                  [Level Metrics]   [Surface Grid]   [Flow Metrics]
+                          |               |               |
+                          v               v               v
+                  [Percentile Engine] --> [Regime Scores] --> [Daily Brief]
+                                                                  |
+                                                                  v
+                                                            [Supabase DB]
 ```
 
 ### Quantitative Methods
@@ -132,10 +138,15 @@ Copy `.env.example` to `.env` and fill in:
 PHASE0_PROVIDER=upstox
 UPSTOX_API_KEY=your-api-key
 UPSTOX_API_SECRET=your-api-secret
-UPSTOX_REDIRECT_URL=https://localhost:8000
+UPSTOX_REDIRECT_URL=http://127.0.0.1:8000/callback
+SESSION_STATE_PATH=./state/session.json
 SUPABASE_DB_URL_SESSION=postgresql://postgres:password@db.project-ref.supabase.co:5432/postgres
 PHASE0_STRIKE_STEP=100
+PHASE0_STRIKES_AROUND_ATM=15
+PHASE0_DAILY_HISTORY_SOURCE=nse_udiff
 ```
+
+`PHASE0_DAILY_HISTORY_SOURCE=nse_udiff` requires no additional API setup. It fetches public NSE FO UDiFF bhavcopy archives over HTTPS. Upstox credentials are still required for live mode and full 1-minute historical replay.
 
 ### Database Setup
 
@@ -145,6 +156,7 @@ Apply migrations via the Supabase dashboard or CLI:
 supabase/migrations/20260315_phase0_initial_schema.sql
 supabase/migrations/20260319_provider_abstraction.sql
 supabase/migrations/20260321_phase1_tables.sql
+supabase/migrations/20260404_history_backfill_audit.sql
 ```
 
 ## Usage
@@ -174,6 +186,28 @@ Replay a full trading day (375 minutes) from historical 1-minute candles:
 python verify_pipeline.py history --date 2026-03-30
 python verify_pipeline.py history --date 2026-03-30 --skip-db
 ```
+
+### Daily Close Mode
+
+Reconstruct a single end-of-day close snapshot without replaying every minute:
+
+```bash
+python verify_pipeline.py daily --date 2026-04-02
+python verify_pipeline.py daily --date 2026-04-02 --source nse_udiff --skip-db
+python verify_pipeline.py daily --date 2026-04-02 --source upstox
+```
+
+Use `nse_udiff` for fast free daily history. Use `upstox` when you want the old broker-backed daily-close path.
+
+### Range Backfill
+
+```bash
+python backfill.py --from 2026-03-24 --to 2026-04-02
+python backfill.py --from 2026-03-24 --to 2026-04-02 --mode daily --daily-source nse_udiff
+python backfill.py --from 2025-04-01 --to 2026-04-02 --daily-before 2026-03-01 --daily-source nse_udiff
+```
+
+Range jobs continue date-by-date when a daily file is missing, unsupported, or malformed. Successful dates still write artifacts, and DB-enabled runs also write a per-run audit trail when the audit migration is applied.
 
 ### Live Worker
 
@@ -205,6 +239,8 @@ python -m pytest tests/ -v
 | `daily_brief_history` | `public` | Historical daily briefs |
 | `worker_heartbeat` | `ops` | Worker liveness tracking |
 | `gap_fill_log` | `ops` | Backfill audit trail |
+| `history_backfill_run` | `ops` | Manual range-backfill run audit |
+| `history_backfill_day_log` | `ops` | Per-date status for manual range backfills |
 
 All writes use idempotent upserts (`ON CONFLICT DO UPDATE`) with source-mode priority guards.
 

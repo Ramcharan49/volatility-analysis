@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import date, datetime, timedelta
+from unittest.mock import patch
 
 from phase0.time_utils import indian_timezone
 from worker.calendar import (
@@ -108,6 +109,25 @@ class TestRateLimiter(unittest.TestCase):
         rl._timestamps.append(old_time)
         rl._prune(time_mod.monotonic())
         self.assertEqual(len(rl._timestamps), 0)
+
+    def test_does_not_oversubscribe_per_second_limit(self):
+        rl = RateLimiter(per_sec=2, per_min=100, per_30min=500)
+        now = {"value": 0.0}
+
+        def fake_monotonic():
+            return now["value"]
+
+        def fake_sleep(seconds):
+            now["value"] += seconds
+
+        with patch("worker.gap_fill.time_mod.monotonic", side_effect=fake_monotonic), \
+             patch("worker.gap_fill.time_mod.sleep", side_effect=fake_sleep):
+            rl.wait_if_needed()
+            rl.wait_if_needed()
+            rl.wait_if_needed()
+
+        recent = [t for t in rl._timestamps if now["value"] - t < 1.0]
+        self.assertLessEqual(len(recent), 2)
 
 
 class TestRowToUniverseItem(unittest.TestCase):

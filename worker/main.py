@@ -29,11 +29,15 @@ from phase0.time_utils import indian_timezone
 from worker.daily_brief import generate_daily_brief, generate_dashboard_payload
 from worker.db import WorkerDatabase
 from worker.percentile import (
+    STATE_SCORE_LEVEL_KEYS,
+    STRESS_SCORE_FLOW_KEYS,
     compute_abs_flow_percentiles,
     compute_flow_percentiles,
     compute_level_percentiles,
     compute_state_score,
     compute_stress_score,
+    metric_history_is_provisional,
+    score_history_is_provisional,
 )
 
 IST = indian_timezone()
@@ -161,7 +165,7 @@ def process_sealed_minute(
                 "tenor_code": p.tenor_code, "window_code": p.window_code,
                 "value": p.value,
                 "percentile": level_pcts.get(p.metric_key),
-                "provisional": baselines is None or len(baselines.get(p.metric_key, [])) < 60,
+                "provisional": metric_history_is_provisional(baselines, p.metric_key),
             }
             for p in level_points
         ] + [
@@ -170,7 +174,7 @@ def process_sealed_minute(
                 "tenor_code": p.tenor_code, "window_code": p.window_code,
                 "value": p.value,
                 "percentile": flow_pcts.get(p.metric_key),
-                "provisional": flow_baselines is None or len(flow_baselines.get(p.metric_key, [])) < 60,
+                "provisional": metric_history_is_provisional(flow_baselines, p.metric_key),
             }
             for p in flow_points
         ]
@@ -181,16 +185,14 @@ def process_sealed_minute(
                 "ts": ts, "metric_key": "state_score",
                 "tenor_code": None, "window_code": None,
                 "value": state_score, "percentile": None,
-                "provisional": baselines is None or any(
-                    len(baselines.get(k, [])) < 60 for k in LEVEL_METRIC_KEYS),
+                "provisional": score_history_is_provisional(baselines, STATE_SCORE_LEVEL_KEYS),
             })
         if stress_score is not None:
             metric_rows.append({
                 "ts": ts, "metric_key": "stress_score",
                 "tenor_code": None, "window_code": None,
                 "value": stress_score, "percentile": None,
-                "provisional": flow_baselines is None or any(
-                    len(flow_baselines.get(k, [])) < 60 for k in FLOW_METRIC_KEYS),
+                "provisional": score_history_is_provisional(flow_baselines, STRESS_SCORE_FLOW_KEYS),
             })
 
         db.upsert_metric_series(metric_rows, source_mode=source_mode)
@@ -342,8 +344,9 @@ class Worker:
                 self._load_prior_close(db)
 
                 # Load baselines for percentile computation
-                baselines = db.fetch_metric_baselines(lookback_days=252)
-                flow_baselines_data = db.fetch_flow_baselines(lookback_days=252)
+                as_of_day = datetime.now(IST).date()
+                baselines = db.fetch_metric_baselines(as_of_day, lookback_days=252)
+                flow_baselines_data = db.fetch_flow_baselines(as_of_day, lookback_days=252)
             else:
                 baselines = None
                 flow_baselines_data = None
@@ -473,8 +476,8 @@ class Worker:
                     log.info("Wrote %d flow baselines for %s", len(flow_baseline_rows), today)
 
                 # 4. Compute closing percentiles
-                baselines = db.fetch_metric_baselines(lookback_days=252)
-                flow_baselines_data = db.fetch_flow_baselines(lookback_days=252)
+                baselines = db.fetch_metric_baselines(today, lookback_days=252)
+                flow_baselines_data = db.fetch_flow_baselines(today, lookback_days=252)
 
                 level_pcts = compute_level_percentiles(level_dict, baselines)
                 flow_pcts = compute_flow_percentiles(flow_dict, flow_baselines_data)
@@ -558,13 +561,11 @@ class Worker:
         log.info("Detected %d gap(s) to fill", len(gaps))
         rate_limiter = RateLimiter()
 
-        # Load baselines once for all gaps
-        gap_baselines = db.fetch_metric_baselines(lookback_days=252)
-        gap_flow_baselines = db.fetch_flow_baselines(lookback_days=252)
-
         for gap in gaps:
             if self._stop:
                 break
+            gap_baselines = db.fetch_metric_baselines(gap.gap_date, lookback_days=252)
+            gap_flow_baselines = db.fetch_flow_baselines(gap.gap_date, lookback_days=252)
             if gap.gap_date == datetime.now(IST).date():
                 backfill_universe = universe
             else:
