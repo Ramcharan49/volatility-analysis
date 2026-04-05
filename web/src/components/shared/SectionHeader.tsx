@@ -8,7 +8,7 @@ export default function SectionHeader({ title, subtitle }: Props) {
     <div className="flex items-baseline gap-3 mb-4 mt-2">
       <h3 className="section-header">{title}</h3>
       {subtitle && (
-        <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
+        <span className="text-xs" style={{ fontFamily: 'var(--font-body)', color: 'var(--text-faint)' }}>
           {subtitle}
         </span>
       )}

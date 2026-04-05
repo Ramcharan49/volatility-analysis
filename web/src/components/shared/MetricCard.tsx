@@ -28,7 +28,7 @@ export default function MetricCard({
     <div className={`card px-4 py-3.5 flex flex-col gap-2 ${className}`}>
       <span
         className="text-xs font-medium tracking-wide uppercase"
-        style={{ color: 'var(--text-muted)' }}
+        style={{ fontFamily: 'var(--font-label)', color: 'var(--text-muted)' }}
       >
         {label}
       </span>
@@ -42,8 +42,9 @@ export default function MetricCard({
       <div className="flex items-center gap-2">
         {percentile != null ? (
           <span
-            className="mono-value text-xs px-1.5 py-0.5 rounded"
+            className="text-xs font-medium px-1.5 py-0.5 rounded"
             style={{
+              fontFamily: 'var(--font-label)',
               color: pctColor,
               background: `${pctColor}15`,
             }}

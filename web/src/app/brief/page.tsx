@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getDashboardCurrent, getRegimeTrail } from '@/lib/queries';
 import RegimeMap from '@/components/brief/RegimeMap';
-import RegimeInterpretation from '@/components/brief/RegimeInterpretation';
+import AnalysisSummary from '@/components/brief/AnalysisSummary';
 import KeyMetricCards from '@/components/brief/KeyMetricCards';
 import DataQualityBar from '@/components/brief/DataQualityBar';
 import LoadingSkeleton, { SkeletonChart } from '@/components/shared/LoadingSkeleton';
@@ -29,11 +29,12 @@ export default function BriefPage() {
   if (loading && !data) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <SkeletonChart height="340px" />
-          <SkeletonChart height="340px" />
+        <SkeletonChart height="420px" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <LoadingSkeleton count={1} />
+          <LoadingSkeleton count={1} />
+          <LoadingSkeleton count={1} />
         </div>
-        <LoadingSkeleton count={5} />
       </div>
     );
   }
@@ -42,24 +43,23 @@ export default function BriefPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
-      {/* Hero: Regime Map + Interpretation */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <RegimeMap
-          stateScore={db?.state_score ?? null}
-          stressScore={db?.stress_score ?? null}
-          trail={data?.trail ?? []}
-        />
-        <RegimeInterpretation
-          quadrant={db?.quadrant ?? null}
-          stateScore={db?.state_score ?? null}
-          stressScore={db?.stress_score ?? null}
-          insights={db?.insight_bullets_json ?? null}
-          scenarios={db?.scenario_implications_json ?? null}
-        />
-      </div>
+      {/* Regime Map — full width with badge overlay */}
+      <RegimeMap
+        stateScore={db?.state_score ?? null}
+        stressScore={db?.stress_score ?? null}
+        quadrant={db?.quadrant ?? null}
+        trail={data?.trail ?? []}
+      />
 
-      {/* Key Metric Cards */}
+      {/* Key Metric Cards — grouped by category */}
       <KeyMetricCards cards={db?.key_cards_json ?? null} />
+
+      {/* Analysis Summary */}
+      <AnalysisSummary
+        quadrant={db?.quadrant ?? null}
+        insights={db?.insight_bullets_json ?? null}
+        scenarios={db?.scenario_implications_json ?? null}
+      />
 
       {/* Data Quality */}
       <DataQualityBar quality={db?.data_quality_json ?? null} asOf={db?.as_of ?? null} />

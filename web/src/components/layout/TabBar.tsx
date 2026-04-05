@@ -48,6 +48,7 @@ export default function TabBar() {
                 href={tab.href}
                 className="relative px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all duration-150"
                 style={{
+                  fontFamily: 'var(--font-label)',
                   color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                   background: isActive ? 'var(--bg-surface)' : 'transparent',
                 }}
