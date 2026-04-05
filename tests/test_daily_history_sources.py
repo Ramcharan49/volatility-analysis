@@ -112,7 +112,7 @@ def _fake_pipeline_result_with_points(ts: datetime) -> dict:
         "level_pcts": {"atm_iv_7d": 60.0},
         "flow_pcts": {"d_atm_iv_7d_1d": 55.0},
         "state_score": 70.0,
-        "stress_score": 25.0,
+        "stress_score": -25.0,
         "quadrant": "Compression",
     }
 

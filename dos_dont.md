@@ -134,8 +134,8 @@
 | Level percentile        | empirical percentile of current level vs trailing daily-close history of the same metric                                                         | chosen v1 percentile method                                               |
 | Flow percentile         | empirical percentile of current window-change vs trailing historical changes of the same window and metric                                       | chosen v1 percentile method                                               |
 | State score             | mean of percentiles for `ATM_IV_7D`, `ATM_IV_30D`, `front_end_dominance`, `-RR25_30D`, `BF25_30D`                                                | product-specific composite                                                |
-| Stress score            | mean of percentiles for absolute `1D` changes in `ATM_IV_7D`, `RR25_30D`, `BF25_30D`, `front_end_dominance`                                       | product-specific composite                                                |
-| Regime quadrant         | `Calm` if both scores < 50, `Transition` if state < 50 and stress >= 50, `Compression` if state >= 50 and stress < 50, `Stress` if both >= 50    | product-specific rule                                                     |
+| Stress score            | signed composite in `-100..100`: magnitude = mean percentile of absolute `1D` changes in `ATM_IV_7D`, `RR25_30D`, `BF25_30D`, `front_end_dominance`; sign comes from aligned directional flow percentiles | product-specific composite                                                |
+| Regime quadrant         | `Calm` if `state < 50` and `stress < 0`, `Transition` if `state < 50` and `stress >= 0`, `Compression` if `state >= 50` and `stress < 0`, `Stress` if `state >= 50` and `stress >= 0` | product-specific rule                                                     |
 | Daily brief text        | deterministic rules from quadrant, key level metrics, and strongest flow changes; no LLM in `v1`                                                 | product-specific rule                                                     |
 
 ## Exact Surface Grid for V1
@@ -175,7 +175,7 @@
 - `Alerts` reads `public.alert_rules` and `public.alert_events`
 - The browser does not query `market.*` or `analytics.*`
 
-`Flow` remains multi-window for exploratory motion. `Stress` is explicitly macro and uses `1D` change percentiles only.
+`Flow` remains multi-window for exploratory motion. `Stress` is explicitly macro, uses `1D` change percentiles only, and is signed so compression/unwind reads negative while stress-building repricing reads positive.
 
 ## Exact Alert Rule Model
 

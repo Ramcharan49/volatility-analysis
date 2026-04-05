@@ -18,7 +18,7 @@ The output is a structured analytics layer suitable for powering dashboards, ale
 | **Term Spreads** | Front-end vs back-end pressure: `ATM(7D) - ATM(30D)`, etc. |
 | **Flow Metrics** | Rate of change across 5m, 15m, 60m, and 1D windows |
 | **State Score** | Composite level percentile (is vol high or low vs history?) |
-| **Stress Score** | Composite flow percentile (is vol moving fast?) |
+| **Stress Score** | Signed composite of 1D flow pressure in `-100..100` (positive = stress, negative = compression) |
 | **Regime Quadrant** | Calm / Transition / Compression / Stress classification |
 
 ## Architecture

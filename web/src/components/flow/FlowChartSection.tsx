@@ -28,8 +28,13 @@ const TENOR_COLORS: Record<TenorCode, string> = {
 
 const SPREAD_COLORS = ['#34d399', '#fb923c', '#f472b6'];
 
+/** Convert Postgres timestamp (e.g. "2026-04-02 09:59:00+00") to epoch ms */
+function parseTs(ts: string): number {
+  return new Date(ts.replace(' ', 'T').replace(/\+(\d{2})$/, '+$1:00')).getTime();
+}
+
 function buildLineOption(
-  series: { label: string; color: string; data: { time: string; value: number }[] }[],
+  series: { label: string; color: string; data: { time: number; value: number }[] }[],
 ): EChartsCoreOption {
   return {
     grid: { top: 16, right: 12, bottom: 28, left: 52 },
@@ -37,7 +42,17 @@ function buildLineOption(
       type: 'time',
       axisLine: { lineStyle: { color: '#1e293b' } },
       axisTick: { show: false },
-      axisLabel: { color: '#475569', fontSize: 9, fontFamily: 'var(--font-mono)' },
+      axisLabel: {
+        color: '#475569',
+        fontSize: 9,
+        fontFamily: 'var(--font-mono)',
+        formatter: (value: number) => {
+          const d = new Date(value);
+          const day = d.getDate();
+          const mon = d.toLocaleString('en', { month: 'short' });
+          return `${day} ${mon}`;
+        },
+      },
       splitLine: { show: false },
     },
     yAxis: {
@@ -81,7 +96,9 @@ function buildLineOption(
       data: s.data.map((d) => [d.time, d.value]),
       lineStyle: { color: s.color, width: 1.5 },
       itemStyle: { color: s.color },
-      symbol: 'none',
+      symbol: 'circle',
+      symbolSize: 4,
+      showSymbol: true,
       smooth: false,
       areaStyle: {
         color: {
@@ -111,7 +128,7 @@ export default function FlowChartSection({
     label: TENOR_LABELS[s.tenor],
     color: TENOR_COLORS[s.tenor],
     data: s.data.map((row) => ({
-      time: row.ts,
+      time: parseTs(row.ts),
       value: row.value != null ? Number(row.value) : 0,
     })),
   }));
@@ -120,7 +137,7 @@ export default function FlowChartSection({
     label: s.label,
     color: SPREAD_COLORS[i % SPREAD_COLORS.length],
     data: s.data.map((row) => ({
-      time: row.ts,
+      time: parseTs(row.ts),
       value: row.value != null ? Number(row.value) : 0,
     })),
   }));

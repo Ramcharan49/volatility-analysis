@@ -516,6 +516,7 @@ def _backfill_day_inner(
         STATE_SCORE_LEVEL_KEYS,
         STRESS_SCORE_FLOW_KEYS,
         compute_abs_flow_percentiles,
+        compute_flow_percentiles,
         compute_level_percentiles,
         compute_state_score,
         compute_stress_score,
@@ -576,8 +577,9 @@ def _backfill_day_inner(
                 level_pcts = compute_level_percentiles(level_dict, baselines)
                 state_score = compute_state_score(level_pcts)
             if flow_baselines:
+                flow_pcts = compute_flow_percentiles(flow_dict, flow_baselines)
                 abs_flow_pcts = compute_abs_flow_percentiles(flow_dict, flow_baselines)
-                stress_score = compute_stress_score(abs_flow_pcts)
+                stress_score = compute_stress_score(flow_pcts, abs_flow_pcts)
 
             # Write to DB
             node_rows = [asdict(n) for n in expiry_nodes]

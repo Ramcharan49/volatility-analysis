@@ -32,7 +32,7 @@ function latestVal(row: MetricRow | undefined): { value: number | null; percenti
 
 export default function FlowPage() {
   const [windowCode, setWindowCode] = useState<WindowCode>('1d');
-  const [timeRange, setTimeRange] = useState<TimeRange>('5D');
+  const [timeRange, setTimeRange] = useState<TimeRange>('1M');
 
   // Build metric keys matching what actually exists in DB:
   // d_atm_iv_7d_{window}, d_atm_iv_30d_{window}

@@ -53,10 +53,13 @@ export function usePolling<T>(
     }
   }, []);
 
+  // Re-fetch immediately whenever fetchFn identity changes (e.g. range/window switch)
   useEffect(() => {
-    // Initial fetch
     refetch();
+  }, [fetchFn]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll on interval during market hours
+  useEffect(() => {
     const timer = setInterval(() => {
       if (isMarketOpen() && navigator.onLine) {
         refetch();

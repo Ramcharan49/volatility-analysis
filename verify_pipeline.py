@@ -464,8 +464,8 @@ def _run_pipeline_for_minute(
         abs_flow_pcts = compute_abs_flow_percentiles(flow_dict, flow_baselines)
     if level_pcts:
         state_score = compute_state_score(level_pcts)
-    if abs_flow_pcts:
-        stress_score = compute_stress_score(abs_flow_pcts)
+    if flow_pcts or abs_flow_pcts:
+        stress_score = compute_stress_score(flow_pcts, abs_flow_pcts)
 
     quadrant = classify_quadrant(state_score, stress_score)
 

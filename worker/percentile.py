@@ -27,6 +27,13 @@ STRESS_SCORE_FLOW_KEYS = (
     "d_front_end_dominance_1d",
 )
 
+_STRESS_DIRECTION_ALIGNS = {
+    "d_atm_iv_7d_1d": 1.0,
+    "d_rr25_30d_1d": -1.0,
+    "d_bf25_30d_1d": 1.0,
+    "d_front_end_dominance_1d": 1.0,
+}
+
 
 def empirical_percentile(value: float, history: List[float]) -> Optional[float]:
     """Compute empirical percentile: rank / (N+1) * 100.
@@ -166,24 +173,47 @@ def compute_state_score(percentiles: Dict[str, Optional[float]]) -> Optional[flo
     return sum(clean) / len(clean)
 
 
-def compute_stress_score(flow_percentiles: Dict[str, Optional[float]]) -> Optional[float]:
-    """Stress score = mean of percentiles for absolute 1D changes in:
-    atm_iv_7d, rr25_30d, bf25_30d, front_end_dominance.
+def compute_stress_direction(flow_percentiles: Dict[str, Optional[float]]) -> Optional[float]:
+    """Signed directional composite for stress.
 
-    Uses percentile of |change|, so we need the absolute-value percentile.
-    Returns None if any required percentile is None.
+    Positive values indicate stress-building repricing pressure.
+    Negative values indicate compression / unwind.
     """
-    keys = [
-        "d_atm_iv_7d_1d",
-        "d_rr25_30d_1d",
-        "d_bf25_30d_1d",
-        "d_front_end_dominance_1d",
-    ]
-    values = [flow_percentiles.get(k) for k in keys]
+    aligned: List[float] = []
+    for key in STRESS_SCORE_FLOW_KEYS:
+        pct = flow_percentiles.get(key)
+        if pct is None:
+            continue
+        direction_component = 2.0 * (pct - 50.0)
+        aligned.append(direction_component * _STRESS_DIRECTION_ALIGNS[key])
+
+    if len(aligned) < 2:
+        return None
+    return sum(aligned) / len(aligned)
+
+
+def compute_stress_score(
+    flow_percentiles: Dict[str, Optional[float]],
+    abs_flow_percentiles: Dict[str, Optional[float]],
+) -> Optional[float]:
+    """Signed stress score in [-100, 100].
+
+    Magnitude comes from absolute 1D flow percentiles.
+    Sign comes from aligned signed-flow percentiles.
+    """
+    values = [abs_flow_percentiles.get(k) for k in STRESS_SCORE_FLOW_KEYS]
     clean = [v for v in values if v is not None]
     if len(clean) < 2:
         return None
-    return sum(clean) / len(clean)
+    direction_score = compute_stress_direction(flow_percentiles)
+    if direction_score is None:
+        return None
+    magnitude = sum(clean) / len(clean)
+    if direction_score > 0:
+        return magnitude
+    if direction_score < 0:
+        return -magnitude
+    return 0.0
 
 
 # ── Regime quadrant ──────────────────────────────────────────────────
@@ -194,14 +224,14 @@ def classify_quadrant(
 ) -> Optional[str]:
     """Classify regime quadrant.
 
-    Calm:        state < 50, stress < 50
-    Transition:  state < 50, stress >= 50
-    Compression: state >= 50, stress < 50
-    Stress:      state >= 50, stress >= 50
+    Calm:        state < 50, stress < 0
+    Transition:  state < 50, stress >= 0
+    Compression: state >= 50, stress < 0
+    Stress:      state >= 50, stress >= 0
     """
     if state_score is None or stress_score is None:
         return None
     if state_score < 50:
-        return "Transition" if stress_score >= 50 else "Calm"
+        return "Transition" if stress_score >= 0 else "Calm"
     else:
-        return "Stress" if stress_score >= 50 else "Compression"
+        return "Stress" if stress_score >= 0 else "Compression"

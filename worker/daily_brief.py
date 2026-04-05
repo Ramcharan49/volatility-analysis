@@ -39,6 +39,14 @@ _QUADRANT_IMPLICATIONS = {
     ],
 }
 
+_QUADRANT_HEADLINES["Compression"] = (
+    "Elevated vol levels but stress is easing â€” market is stable, watching for resolution"
+)
+_QUADRANT_IMPLICATIONS["Compression"] = [
+    "Elevated premiums persist while repricing pressure is easing",
+    "Term structure shape may indicate hedging demand",
+]
+
 
 # ── Key cards ────────────────────────────────────────────────────────
 

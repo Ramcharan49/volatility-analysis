@@ -133,8 +133,8 @@ def process_sealed_minute(
         abs_flow_pcts = {}
     if level_pcts:
         state_score = compute_state_score(level_pcts)
-    if abs_flow_pcts:
-        stress_score = compute_stress_score(abs_flow_pcts)
+    if flow_pcts or abs_flow_pcts:
+        stress_score = compute_stress_score(flow_pcts, abs_flow_pcts)
 
     # 6. Surface grid
     surface_cells = compute_surface_grid(cm_nodes, ts)
@@ -483,7 +483,7 @@ class Worker:
                 flow_pcts = compute_flow_percentiles(flow_dict, flow_baselines_data)
                 abs_flow_pcts = compute_abs_flow_percentiles(flow_dict, flow_baselines_data)
                 state_score = compute_state_score(level_pcts)
-                stress_score = compute_stress_score(abs_flow_pcts)
+                stress_score = compute_stress_score(flow_pcts, abs_flow_pcts)
 
                 log.info("Closing scores: state=%.1f, stress=%.1f",
                          state_score or 0, stress_score or 0)

@@ -89,7 +89,7 @@ class TestInsightBullets(unittest.TestCase):
 class TestDashboardPayload(unittest.TestCase):
     def test_calm_quadrant(self):
         payload = generate_dashboard_payload(
-            ts=TS, state_score=30.0, stress_score=30.0,
+            ts=TS, state_score=30.0, stress_score=-30.0,
             levels={"atm_iv_7d": 0.18},
             percentiles={"atm_iv_7d": 30.0},
             flows={},
@@ -133,6 +133,17 @@ class TestDailyBrief(unittest.TestCase):
         b2 = generate_daily_brief(**kwargs)
         self.assertEqual(b1["quadrant"], b2["quadrant"])
         self.assertEqual(b1["headline"], b2["headline"])
+
+    def test_negative_stress_with_high_state_is_compression(self):
+        brief = generate_daily_brief(
+            brief_date=date(2026, 3, 16),
+            state_score=70.0, stress_score=-25.0,
+            levels={"atm_iv_7d": 0.25},
+            percentiles={},
+            flows={},
+        )
+        self.assertEqual(brief["quadrant"], "Compression")
+        self.assertIn("stable", brief["headline"])
 
 
 if __name__ == "__main__":

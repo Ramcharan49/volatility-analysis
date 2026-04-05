@@ -116,8 +116,8 @@ web/
 
 **Top row (hero)**: Two-column layout
 - **Left**: Regime Map (ECharts scatter plot)
-  - 2D plot: X = state_score (0-100), Y = stress_score (0-100)
-  - 4 colored quadrant backgrounds: Calm (green), Transition (amber), Compression (blue), Stress (red)
+  - 2D plot: X = state_score (0-100), Y = stress_score (-100 to 100)
+  - 4 colored quadrant backgrounds split at `state = 50` and `stress = 0`: Calm (green), Transition (amber), Compression (blue), Stress (red)
   - Markers: filled circle for today, hollow circles for yesterday and 2-days-back
   - Trail derived from `metric_series_1m` querying `state_score` and `stress_score` at last minute of each trading day
 - **Right**: Regime Interpretation panel

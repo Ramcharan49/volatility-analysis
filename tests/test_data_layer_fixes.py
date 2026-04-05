@@ -72,8 +72,8 @@ class TestB2AbsFlowPercentiles(unittest.TestCase):
         source = Path("worker/main.py").read_text()
         self.assertIn("compute_abs_flow_percentiles", source,
                        "worker/main.py must use compute_abs_flow_percentiles for stress")
-        # Verify stress_score is computed from abs_flow_pcts, not flow_pcts
-        self.assertIn("compute_stress_score(abs_flow_pcts)", source)
+        self.assertIn("compute_flow_percentiles", source)
+        self.assertIn("compute_stress_score(flow_pcts, abs_flow_pcts)", source)
 
     def test_none_for_insufficient_history(self):
         """B2: Returns None when history is too short."""

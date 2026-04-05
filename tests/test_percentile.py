@@ -6,6 +6,7 @@ from worker.percentile import (
     MIN_DAYS_FOR_PERCENTILE,
     classify_quadrant,
     compute_state_score,
+    compute_stress_direction,
     compute_stress_score,
     empirical_percentile,
     is_provisional,
@@ -97,37 +98,93 @@ class TestStateScore(unittest.TestCase):
 
 
 class TestStressScore(unittest.TestCase):
-    def test_all_at_50(self):
-        pcts = {
+    def test_all_at_50_is_neutral(self):
+        flow_pcts = {
             "d_atm_iv_7d_1d": 50.0,
             "d_rr25_30d_1d": 50.0,
             "d_bf25_30d_1d": 50.0,
             "d_front_end_dominance_1d": 50.0,
         }
-        score = compute_stress_score(pcts)
-        self.assertAlmostEqual(score, 50.0)
+        abs_flow_pcts = dict(flow_pcts)
+        score = compute_stress_score(flow_pcts, abs_flow_pcts)
+        self.assertAlmostEqual(score, 0.0)
+
+    def test_stress_aligned_flows_produce_positive_score(self):
+        flow_pcts = {
+            "d_atm_iv_7d_1d": 90.0,
+            "d_rr25_30d_1d": 10.0,
+            "d_bf25_30d_1d": 85.0,
+            "d_front_end_dominance_1d": 80.0,
+        }
+        abs_flow_pcts = {
+            "d_atm_iv_7d_1d": 95.0,
+            "d_rr25_30d_1d": 92.0,
+            "d_bf25_30d_1d": 88.0,
+            "d_front_end_dominance_1d": 84.0,
+        }
+        score = compute_stress_score(flow_pcts, abs_flow_pcts)
+        self.assertGreater(score, 0.0)
+        self.assertAlmostEqual(score, (95.0 + 92.0 + 88.0 + 84.0) / 4)
+
+    def test_compression_aligned_flows_produce_negative_score(self):
+        flow_pcts = {
+            "d_atm_iv_7d_1d": 10.0,
+            "d_rr25_30d_1d": 90.0,
+            "d_bf25_30d_1d": 15.0,
+            "d_front_end_dominance_1d": 20.0,
+        }
+        abs_flow_pcts = {
+            "d_atm_iv_7d_1d": 95.0,
+            "d_rr25_30d_1d": 92.0,
+            "d_bf25_30d_1d": 88.0,
+            "d_front_end_dominance_1d": 84.0,
+        }
+        score = compute_stress_score(flow_pcts, abs_flow_pcts)
+        self.assertLess(score, 0.0)
+        self.assertAlmostEqual(score, -((95.0 + 92.0 + 88.0 + 84.0) / 4))
 
     def test_missing_returns_none(self):
-        pcts = {"d_atm_iv_7d_1d": 50.0}  # Only 1 of 4
-        score = compute_stress_score(pcts)
+        flow_pcts = {"d_atm_iv_7d_1d": 50.0}  # Only 1 of 4
+        abs_flow_pcts = {"d_atm_iv_7d_1d": 50.0}
+        score = compute_stress_score(flow_pcts, abs_flow_pcts)
         self.assertIsNone(score)
+
+
+class TestStressDirection(unittest.TestCase):
+    def test_rr_direction_is_inverted_for_stress(self):
+        flow_pcts = {
+            "d_atm_iv_7d_1d": 50.0,
+            "d_rr25_30d_1d": 10.0,
+            "d_bf25_30d_1d": 50.0,
+            "d_front_end_dominance_1d": 50.0,
+        }
+        self.assertGreater(compute_stress_direction(flow_pcts), 0.0)
+
+    def test_exact_tie_returns_zero_direction(self):
+        flow_pcts = {
+            "d_atm_iv_7d_1d": 90.0,
+            "d_rr25_30d_1d": 10.0,
+            "d_bf25_30d_1d": 10.0,
+            "d_front_end_dominance_1d": 10.0,
+        }
+        self.assertAlmostEqual(compute_stress_direction(flow_pcts), 0.0)
 
 
 class TestClassifyQuadrant(unittest.TestCase):
     def test_calm(self):
-        self.assertEqual(classify_quadrant(30, 30), "Calm")
+        self.assertEqual(classify_quadrant(30, -30), "Calm")
 
     def test_transition(self):
         self.assertEqual(classify_quadrant(30, 70), "Transition")
 
     def test_compression(self):
-        self.assertEqual(classify_quadrant(70, 30), "Compression")
+        self.assertEqual(classify_quadrant(70, -30), "Compression")
 
     def test_stress(self):
         self.assertEqual(classify_quadrant(70, 70), "Stress")
 
-    def test_boundary_at_50(self):
-        self.assertEqual(classify_quadrant(50, 50), "Stress")
+    def test_boundary_at_zero(self):
+        self.assertEqual(classify_quadrant(50, 0), "Stress")
 
     def test_none_returns_none(self):
         self.assertIsNone(classify_quadrant(None, 50))
