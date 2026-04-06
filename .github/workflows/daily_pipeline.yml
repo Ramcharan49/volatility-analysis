@@ -1,0 +1,51 @@
+name: Daily Pipeline
+
+on:
+  schedule:
+    - cron: '0 13 * * 1-5'  # 18:30 IST (13:00 UTC) Mon-Fri
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Target date (YYYY-MM-DD). Leave empty for today (IST).'
+        required: false
+        type: string
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  run-daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements-phase0.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements-phase0.txt
+
+      - name: Run daily pipeline
+        env:
+          SUPABASE_DB_URL_SESSION: ${{ secrets.SUPABASE_DB_URL_SESSION }}
+          PHASE0_PROVIDER: nse_udiff
+          PHASE0_DAILY_HISTORY_SOURCE: nse_udiff
+          PHASE0_STRIKE_STEP: '100'
+          PHASE0_STRIKES_AROUND_ATM: '15'
+        run: |
+          TARGET_DATE="${{ github.event.inputs.date }}"
+          if [ -z "$TARGET_DATE" ]; then
+            TARGET_DATE=$(TZ=Asia/Kolkata date +%Y-%m-%d)
+          fi
+          echo "::notice::Running daily pipeline for $TARGET_DATE"
+          python backfill.py --from "$TARGET_DATE" --to "$TARGET_DATE" --mode daily --daily-source nse_udiff
