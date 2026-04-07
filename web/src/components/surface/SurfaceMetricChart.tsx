@@ -56,10 +56,10 @@ function buildOption(
     grid: { top: 8, right: 12, bottom: 24, left: 48 },
     xAxis: {
       type: 'time',
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLine: { lineStyle: { color: '#212121' } },
       axisTick: { show: false },
       axisLabel: {
-        color: '#475569',
+        color: '#595959',
         fontSize: 9,
         fontFamily: 'var(--font-mono)',
         formatter: (value: number) => {
@@ -74,21 +74,21 @@ function buildOption(
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: {
-        color: '#475569',
+        color: '#595959',
         fontSize: 9,
         fontFamily: 'var(--font-mono)',
         formatter: isPctl
           ? (v: number) => `${Math.round(v)}`
           : (v: number) => `${(v * 100).toFixed(1)}%`,
       },
-      splitLine: { lineStyle: { color: '#111827', type: 'dashed' } },
+      splitLine: { lineStyle: { color: '#161616', type: 'dashed' } },
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(17, 24, 39, 0.95)',
-      borderColor: '#374151',
-      textStyle: { color: '#e5e7eb', fontSize: 11 },
-      axisPointer: { lineStyle: { color: '#374151' } },
+      backgroundColor: 'rgba(33, 33, 33, 0.95)',
+      borderColor: '#353535',
+      textStyle: { color: '#ffffff', fontSize: 11 },
+      axisPointer: { lineStyle: { color: '#353535' } },
       formatter: (params: { value: [number, number] }[]) => {
         if (!params.length) return '';
         const [ts, val] = params[0].value;
@@ -127,7 +127,7 @@ function buildOption(
               data: data.length > 0
                 ? [[data[0].time, 0], [data[data.length - 1].time, 0]]
                 : [],
-              lineStyle: { color: '#374151', width: 1, type: 'dashed' as const },
+              lineStyle: { color: '#353535', width: 1, type: 'dashed' as const },
               symbol: 'none' as const,
               z: 1,
             },
@@ -250,7 +250,7 @@ export default function SurfaceMetricChart({
           {latestValue.value != null && (
             <span
               className="mono-value text-lg font-semibold"
-              style={{ color: isPctl ? '#9CA3AF' : pctlColor }}
+              style={{ color: isPctl ? '#b9b9b9' : pctlColor }}
             >
               {isPctl
                 ? `${Math.round(latestValue.percentile ?? 0)}th`

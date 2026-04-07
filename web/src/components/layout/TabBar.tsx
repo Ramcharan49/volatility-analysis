@@ -18,7 +18,7 @@ export default function TabBar() {
     <header
       className="sticky top-0 z-50 flex items-center justify-between px-6 py-3"
       style={{
-        background: 'var(--bg-secondary)',
+        background: 'rgba(11, 11, 11, 0.85)',
         borderBottom: '1px solid var(--border-primary)',
         backdropFilter: 'blur(12px)',
       }}
@@ -28,7 +28,7 @@ export default function TabBar() {
         <div className="flex items-center gap-2.5 mr-6">
           <div
             className="w-2 h-2 rounded-full"
-            style={{ background: 'var(--accent-cyan)', boxShadow: '0 0 8px var(--accent-cyan)' }}
+            style={{ background: 'var(--cta-coral)' }}
           />
           <span
             className="text-sm font-semibold tracking-wide"

@@ -152,7 +152,7 @@ export default function SurfacePage() {
 
   if (loading && !data) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
+      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
         <SkeletonChart height="220px" />
         <LoadingSkeleton count={3} />
         <LoadingSkeleton count={3} />
@@ -161,7 +161,7 @@ export default function SurfacePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
+    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
       {/* Global controls bar */}
       <div
         className="flex items-center gap-4 px-4 py-3 rounded-lg sticky top-[52px] z-30"
@@ -200,7 +200,7 @@ export default function SurfacePage() {
             ]}
             seriesMap={seriesMap}
             latestMap={latestMap}
-            color="#06b6d4"
+            color="#0052ef"
           />
           <SurfaceMetricChart
             title="IV Term Spread"
@@ -211,7 +211,7 @@ export default function SurfacePage() {
             ]}
             seriesMap={seriesMap}
             latestMap={latestMap}
-            color="#06b6d4"
+            color="#0052ef"
             zeroline
             valueLabel="SPREAD"
           />

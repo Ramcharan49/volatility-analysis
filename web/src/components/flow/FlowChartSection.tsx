@@ -21,7 +21,7 @@ interface Props {
 }
 
 const TENOR_COLORS: Record<TenorCode, string> = {
-  '7d': '#06b6d4',
+  '7d': '#0052ef',
   '30d': '#a78bfa',
   '90d': '#f59e0b',
 };
@@ -40,12 +40,15 @@ function buildLineOption(
     grid: { top: 16, right: 12, bottom: 28, left: 52 },
     xAxis: {
       type: 'time',
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      boundaryGap: ['2%', '8%'],
+      maxInterval: 3600 * 24 * 1000 * 2,
+      axisLine: { lineStyle: { color: '#212121' } },
       axisTick: { show: false },
       axisLabel: {
-        color: '#475569',
+        color: '#595959',
         fontSize: 9,
         fontFamily: 'var(--font-mono)',
+        hideOverlap: true,
         formatter: (value: number) => {
           const d = new Date(value);
           const day = d.getDate();
@@ -60,25 +63,25 @@ function buildLineOption(
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: {
-        color: '#475569',
+        color: '#595959',
         fontSize: 9,
         fontFamily: 'var(--font-mono)',
         formatter: (v: number) => `${(v * 100).toFixed(1)}%`,
       },
-      splitLine: { lineStyle: { color: '#111827', type: 'dashed' } },
+      splitLine: { lineStyle: { color: '#161616', type: 'dashed' } },
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(17, 24, 39, 0.95)',
-      borderColor: '#374151',
-      textStyle: { color: '#e5e7eb', fontSize: 11 },
-      axisPointer: { lineStyle: { color: '#374151' } },
+      backgroundColor: 'rgba(33, 33, 33, 0.95)',
+      borderColor: '#353535',
+      textStyle: { color: '#ffffff', fontSize: 11 },
+      axisPointer: { lineStyle: { color: '#353535' } },
     },
     legend: {
       show: series.length > 1,
       top: 0,
       right: 0,
-      textStyle: { color: '#64748b', fontSize: 10 },
+      textStyle: { color: '#797979', fontSize: 10 },
       icon: 'roundRect',
       itemWidth: 12,
       itemHeight: 3,
@@ -100,6 +103,22 @@ function buildLineOption(
       symbolSize: 4,
       showSymbol: true,
       smooth: false,
+      endLabel: {
+        show: true,
+        formatter: (p: { value: [number, number] }) =>
+          `${p.value[1] >= 0 ? '+' : ''}${(p.value[1] * 100).toFixed(2)}%`,
+        color: s.color,
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10,
+        distance: 6,
+      },
+      markPoint: {
+        symbol: 'circle',
+        symbolSize: 9,
+        itemStyle: { color: s.color, borderColor: '#0b0b0b', borderWidth: 2 },
+        label: { show: false },
+        data: [{ type: 'max', valueDim: 'x' }],
+      },
       areaStyle: {
         color: {
           type: 'linear',

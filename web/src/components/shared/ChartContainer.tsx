@@ -48,7 +48,7 @@ export default function ChartContainer({ option, height = '300px', className = '
     chartRef.current = chart;
     chart.setOption({
       backgroundColor: 'transparent',
-      textStyle: { color: '#9CA3AF', fontFamily: 'var(--font-display)' },
+      textStyle: { color: '#b9b9b9', fontFamily: 'var(--font-display)' },
       ...option,
     });
     onInit?.(chart);

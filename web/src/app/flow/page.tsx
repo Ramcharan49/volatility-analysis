@@ -59,7 +59,7 @@ export default function FlowPage() {
 
   if (loading && !data) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
+      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
         <div className="flex gap-3"><div className="skeleton h-8 w-40" /><div className="skeleton h-8 w-40" /></div>
         <SkeletonChart height="250px" />
         <SkeletonChart height="250px" />
@@ -79,7 +79,7 @@ export default function FlowPage() {
   const fed = `${FLOW_KEYS.D_FRONT_END_DOMINANCE}_${w}`;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
+    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
       {/* Global controls */}
       <div
         className="flex items-center gap-4 px-4 py-3 rounded-lg sticky top-[52px] z-30"

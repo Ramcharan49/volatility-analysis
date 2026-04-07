@@ -50,11 +50,11 @@ export default function MarketStatusBadge() {
       <div
         className="glow-dot"
         style={{
-          background: isOpen ? '#34d399' : '#ef4444',
-          color: isOpen ? '#34d399' : '#ef4444',
+          background: isOpen ? '#19d600' : '#dd0000',
+          color: isOpen ? '#19d600' : '#dd0000',
         }}
       />
-      <span style={{ color: isOpen ? '#34d399' : 'var(--text-muted)' }}>
+      <span style={{ color: isOpen ? '#19d600' : 'var(--text-muted)' }}>
         {isOpen ? 'Live' : 'Closed'}
       </span>
       <span style={{ color: 'var(--text-faint)' }}>{time}</span>

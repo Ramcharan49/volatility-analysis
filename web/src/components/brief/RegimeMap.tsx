@@ -77,30 +77,30 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
       name: 'SURFACE STATE → (Volatility Level)',
       nameLocation: 'center',
       nameGap: 30,
-      nameTextStyle: { color: '#475569', fontSize: 10, fontFamily: 'var(--font-label)', letterSpacing: 1 },
+      nameTextStyle: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-label)', letterSpacing: 1 },
       min: 0,
       max: 100,
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLine: { lineStyle: { color: '#212121' } },
       axisTick: { show: false },
-      axisLabel: { color: '#475569', fontSize: 10, fontFamily: 'var(--font-mono)' },
+      axisLabel: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-mono)' },
       splitLine: { show: false },
     },
     yAxis: {
       name: 'SURFACE FLOW → (Volatility Change)',
       nameLocation: 'center',
       nameGap: 40,
-      nameTextStyle: { color: '#475569', fontSize: 10, fontFamily: 'var(--font-label)', letterSpacing: 1 },
+      nameTextStyle: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-label)', letterSpacing: 1 },
       min: -100,
       max: 100,
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLine: { lineStyle: { color: '#212121' } },
       axisTick: { show: false },
-      axisLabel: { color: '#475569', fontSize: 10, fontFamily: 'var(--font-mono)' },
+      axisLabel: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-mono)' },
       splitLine: { show: false },
     },
     tooltip: {
-      backgroundColor: 'rgba(17, 24, 39, 0.95)',
-      borderColor: '#374151',
-      textStyle: { color: '#e5e7eb', fontSize: 12 },
+      backgroundColor: 'rgba(33, 33, 33, 0.95)',
+      borderColor: '#353535',
+      textStyle: { color: '#ffffff', fontSize: 12 },
     },
     series: [
       // Quadrant backgrounds
@@ -133,14 +133,14 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
       {
         type: 'line',
         data: [[50, -100], [50, 100]],
-        lineStyle: { color: '#1e293b', width: 1, type: 'dashed' },
+        lineStyle: { color: '#212121', width: 1, type: 'dashed' },
         symbol: 'none',
         z: 1,
       },
       {
         type: 'line',
         data: [[0, 0], [100, 0]],
-        lineStyle: { color: '#1e293b', width: 1, type: 'dashed' },
+        lineStyle: { color: '#212121', width: 1, type: 'dashed' },
         symbol: 'none',
         z: 1,
       },
@@ -156,9 +156,9 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
               })),
               symbol: 'circle',
               symbolSize: 5,
-              itemStyle: { color: '#475569', opacity: 0.15 },
+              itemStyle: { color: '#595959', opacity: 0.15 },
               emphasis: {
-                itemStyle: { opacity: 0.6, shadowBlur: 8, shadowColor: 'rgba(71, 85, 105, 0.5)' },
+                itemStyle: { opacity: 0.6, shadowBlur: 8, shadowColor: 'rgba(89, 89, 89, 0.5)' },
               },
               tooltip: {
                 formatter: (params: { value: number[]; data: { date: string } }) =>
@@ -172,7 +172,7 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
       {
         type: 'line',
         data: recentPoints,
-        lineStyle: { color: '#06b6d4', width: 1.5, type: 'dashed', opacity: 0.5 },
+        lineStyle: { color: '#0052ef', width: 1.5, type: 'dashed', opacity: 0.5 },
         symbol: 'none',
         z: 5,
       },
@@ -187,23 +187,23 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
           symbol: 'circle',
           symbolSize: isLast ? 12 : 6 + (i / recentPoints.length) * 4,
           itemStyle: {
-            color: isLast ? '#06b6d4' : 'transparent',
-            borderColor: '#06b6d4',
+            color: isLast ? '#0052ef' : 'transparent',
+            borderColor: '#0052ef',
             borderWidth: isLast ? 3 : 2,
             opacity,
             ...(isLast
-              ? { shadowBlur: 20, shadowColor: 'rgba(6, 182, 212, 0.6)' }
+              ? { shadowBlur: 20, shadowColor: 'rgba(0, 82, 239, 0.6)' }
               : {}),
           },
           emphasis: {
-            itemStyle: { shadowBlur: 16, shadowColor: 'rgba(6, 182, 212, 0.5)' },
+            itemStyle: { shadowBlur: 16, shadowColor: 'rgba(0, 82, 239, 0.5)' },
           },
           z: 10,
           label: {
             show: isLast || isFirst || recentPoints.length <= 5,
             position: 'top' as const,
             formatter: recentDates[i] ?? '',
-            color: isLast ? '#06b6d4' : '#64748b',
+            color: isLast ? '#0052ef' : '#797979',
             fontSize: 9,
             fontFamily: 'var(--font-label)',
             distance: 10,
@@ -224,7 +224,7 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
               symbolSize: 24,
               itemStyle: {
                 color: 'transparent',
-                borderColor: '#06b6d4',
+                borderColor: '#0052ef',
                 borderWidth: 1,
                 opacity: 0.3,
               },
@@ -238,7 +238,7 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
               symbolSize: 36,
               itemStyle: {
                 color: 'transparent',
-                borderColor: '#06b6d4',
+                borderColor: '#0052ef',
                 borderWidth: 1,
                 opacity: 0.12,
               },
@@ -325,7 +325,7 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
                 <div
                   key={i}
                   className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: '#06b6d4', opacity: op }}
+                  style={{ background: '#0052ef', opacity: op }}
                 />
               ))}
             </div>
@@ -336,7 +336,7 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
           <div className="flex items-center gap-1.5">
             <div
               className="w-2.5 h-2.5 rounded-full"
-              style={{ background: '#06b6d4', boxShadow: '0 0 6px rgba(6,182,212,0.5)' }}
+              style={{ background: '#0052ef', boxShadow: '0 0 6px rgba(6,182,212,0.5)' }}
             />
             <span className="text-[0.6rem]" style={{ color: 'var(--text-faint)' }}>
               Current regime

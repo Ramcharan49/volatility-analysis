@@ -40,16 +40,16 @@ export default function IVHeatmap({ cells }: Props) {
     xAxis: {
       type: 'category',
       data: TENORS.map((t) => TENOR_LABELS[t]),
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLine: { lineStyle: { color: '#212121' } },
       axisTick: { show: false },
-      axisLabel: { color: '#94a3b8', fontSize: 11, fontFamily: 'var(--font-mono)' },
+      axisLabel: { color: '#b9b9b9', fontSize: 11, fontFamily: 'var(--font-mono)' },
     },
     yAxis: {
       type: 'category',
       data: reversedDeltas.map((d) => DELTA_LABELS[d]),
-      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisLine: { lineStyle: { color: '#212121' } },
       axisTick: { show: false },
-      axisLabel: { color: '#94a3b8', fontSize: 11, fontFamily: 'var(--font-display)' },
+      axisLabel: { color: '#b9b9b9', fontSize: 11, fontFamily: 'var(--font-display)' },
     },
     visualMap: {
       show: true,
@@ -60,7 +60,7 @@ export default function IVHeatmap({ cells }: Props) {
       top: 'center',
       itemHeight: 160,
       itemWidth: 10,
-      textStyle: { color: '#64748b', fontSize: 10, fontFamily: 'var(--font-mono)' },
+      textStyle: { color: '#797979', fontSize: 10, fontFamily: 'var(--font-mono)' },
       formatter: (val: number) => mode === 'iv' ? `${(val * 100).toFixed(0)}%` : `${val.toFixed(0)}`,
       inRange: {
         color: mode === 'iv'
@@ -69,14 +69,14 @@ export default function IVHeatmap({ cells }: Props) {
       },
     },
     tooltip: {
-      backgroundColor: 'rgba(17, 24, 39, 0.95)',
-      borderColor: '#374151',
-      textStyle: { color: '#e5e7eb', fontSize: 12 },
+      backgroundColor: 'rgba(33, 33, 33, 0.95)',
+      borderColor: '#353535',
+      textStyle: { color: '#ffffff', fontSize: 12 },
       formatter: (params: { value: [number, number, number | null] }) => {
         const [col, row, val] = params.value;
         const tenor = TENOR_LABELS[TENORS[col]];
         const delta = DELTA_LABELS[reversedDeltas[row]];
-        if (val == null) return `${delta} × ${tenor}<br/><span style="color:#64748b">No data</span>`;
+        if (val == null) return `${delta} × ${tenor}<br/><span style="color:#797979">No data</span>`;
         const formatted = mode === 'iv' ? `${(val * 100).toFixed(2)}%` : `${val.toFixed(1)}th`;
         return `${delta} × ${tenor}<br/><strong>${formatted}</strong>`;
       },
@@ -101,10 +101,10 @@ export default function IVHeatmap({ cells }: Props) {
             const num = Number(v);
             return mode === 'iv' ? `${(num * 100).toFixed(2)}%` : `${num.toFixed(0)}`;
           },
-          color: '#f1f5f9',
+          color: '#ffffff',
         },
         emphasis: {
-          itemStyle: { borderColor: '#06b6d4', borderWidth: 2 },
+          itemStyle: { borderColor: '#0052ef', borderWidth: 2 },
         },
       },
     ],
