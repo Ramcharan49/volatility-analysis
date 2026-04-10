@@ -79,3 +79,19 @@ export type TenorCode = '7d' | '30d' | '90d';
 export type WindowCode = '5m' | '15m' | '60m' | '1d';
 export type TimeRange = '1D' | '5D' | '1M' | '3M';
 export type DeltaBucket = 'P25' | 'ATM' | 'C25';
+
+export type MetricFormat = 'pct' | 'bps' | 'score' | 'raw';
+export type MetricFamily = 'volatility' | 'skew' | 'tail' | 'fed' | 'term' | 'regime';
+
+export interface MetricMeta {
+  key: string;
+  displayName: string;
+  shortName: string;
+  tenor: TenorCode | null;
+  family: MetricFamily;
+  color: string;
+  format: MetricFormat;
+  relatedKeys: string[];
+  spreadKey: string | null;
+  explainer: string;
+}
