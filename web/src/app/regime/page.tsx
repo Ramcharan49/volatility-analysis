@@ -12,8 +12,8 @@ export default function RegimeDetailPage() {
 
   if (loading && !dashboard) {
     return (
-      <div className="max-w-lg mx-auto px-3 py-2">
-        <SkeletonChart height="400px" />
+      <div className="max-w-5xl mx-auto px-6 py-4">
+        <SkeletonChart height="500px" />
       </div>
     );
   }
@@ -22,7 +22,7 @@ export default function RegimeDetailPage() {
   const config = QUADRANT_CONFIG[q] ?? QUADRANT_CONFIG.Calm;
 
   return (
-    <div className="max-w-2xl mx-auto px-3 py-2 flex flex-col gap-3 page-enter">
+    <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-4 page-enter">
       {/* Back nav */}
       <div className="flex items-center" style={{ padding: '4px 0' }}>
         <Link href="/" className="flex items-center gap-1.5">

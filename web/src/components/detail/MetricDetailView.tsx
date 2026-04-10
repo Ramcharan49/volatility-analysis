@@ -99,78 +99,79 @@ export default function MetricDetailView({ metricKey }: Props) {
   const ranges: ('1D' | '5D' | '1M' | '3M')[] = ['1D', '5D', '1M', '3M'];
 
   return (
-    <div className="max-w-lg mx-auto px-3 py-2 flex flex-col gap-2 page-enter">
+    <div className="max-w-4xl mx-auto px-6 py-4 flex flex-col gap-3 page-enter">
       {/* Back nav */}
-      <div className="flex items-center justify-between" style={{ padding: '4px 0' }}>
+      <div className="flex items-center" style={{ padding: '4px 0' }}>
         <Link href="/" className="flex items-center gap-1.5">
           <span style={{ color: 'var(--accent-cyan)', fontSize: 14 }}>&lsaquo;</span>
-          <span className="text-[11px]" style={{ color: 'var(--accent-cyan)' }}>Home</span>
+          <span className="text-xs" style={{ color: 'var(--accent-cyan)' }}>Home</span>
         </Link>
-        <span className="mono-value text-[10px]" style={{ color: 'var(--text-faint)' }}>
-          {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST
-        </span>
       </div>
 
-      {/* Hero row */}
-      <div className="flex items-end justify-between">
-        <div>
-          <div className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-label)', letterSpacing: '1px' }}>
-            {meta.displayName} {meta.tenor ? `\u00B7 ${meta.tenor.toUpperCase()}` : ''}
+      {/* 2-column desktop layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left: hero + chart */}
+        <div className="lg:col-span-3 flex flex-col gap-3">
+          {/* Hero row */}
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-label)', letterSpacing: '1px' }}>
+                {meta.displayName} {meta.tenor ? `\u00B7 ${meta.tenor.toUpperCase()}` : ''}
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="mono-value font-bold" style={{ fontSize: 'var(--font-size-hero)', color: 'var(--text-primary)', lineHeight: 1 }}>
+                  {formatMetricValue(value, meta.format)}
+                </span>
+              </div>
+            </div>
+            <div className="text-right pb-1">
+              <div className="mono-value text-xl font-semibold" style={{ color: pctColor, lineHeight: 1 }}>
+                P{pct != null ? Math.round(pct) : '--'}
+              </div>
+              <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
+                {pct != null ? (pct < 40 ? 'Below avg' : pct < 60 ? 'Normal' : pct < 80 ? 'Elevated' : 'High') : ''}
+              </div>
+            </div>
           </div>
-          <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="mono-value font-bold" style={{ fontSize: 'var(--font-size-hero)', color: 'var(--text-primary)', lineHeight: 1 }}>
-              {formatMetricValue(value, meta.format)}
-            </span>
+
+          {/* Percentile bar */}
+          <PercentileBar percentile={pct} />
+
+          {/* Chart */}
+          <ChartContainer option={chartOption} height="280px" />
+
+          {/* Time range pills */}
+          <div className="pill-group" style={{ paddingBottom: 'var(--space-xs)' }}>
+            {ranges.map((r) => (
+              <button
+                key={r}
+                className={`pill-btn ${timeRange === r ? 'active' : ''}`}
+                onClick={() => setTimeRange(r)}
+              >
+                {r}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="text-right pb-1">
-          <div className="mono-value text-lg font-semibold" style={{ color: pctColor, lineHeight: 1 }}>
-            P{pct != null ? Math.round(pct) : '--'}
-          </div>
-          <div className="text-[9px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
-            {pct != null ? (pct < 40 ? 'Below avg' : pct < 60 ? 'Normal' : pct < 80 ? 'Elevated' : 'High') : ''}
-          </div>
+
+        {/* Right: stats + related + explainer */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          <StatsGrid items={statsItems} />
+
+          <RelatedTenors relatedKeys={meta.relatedKeys} latestMap={latestMap} />
+
+          {meta.explainer && (
+            <details className="card-dense" style={{ padding: '10px 14px' }}>
+              <summary className="text-[11px] cursor-pointer" style={{ color: 'var(--text-muted)' }}>
+                What is {meta.shortName}?
+              </summary>
+              <p className="text-[13px] mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                {meta.explainer}
+              </p>
+            </details>
+          )}
         </div>
       </div>
-
-      {/* Percentile bar */}
-      <PercentileBar percentile={pct} />
-
-      {/* Chart */}
-      <div style={{ margin: '0 -8px' }}>
-        <ChartContainer option={chartOption} height="150px" />
-      </div>
-
-      {/* Time range pills */}
-      <div className="pill-group" style={{ paddingBottom: 'var(--space-xs)' }}>
-        {ranges.map((r) => (
-          <button
-            key={r}
-            className={`pill-btn ${timeRange === r ? 'active' : ''}`}
-            onClick={() => setTimeRange(r)}
-          >
-            {r}
-          </button>
-        ))}
-      </div>
-
-      {/* Stats grid */}
-      <StatsGrid items={statsItems} />
-
-      {/* Related tenors */}
-      <RelatedTenors relatedKeys={meta.relatedKeys} latestMap={latestMap} />
-
-      {/* Explainer (collapsed) */}
-      {meta.explainer && (
-        <details className="card-dense" style={{ padding: '8px 12px' }}>
-          <summary className="text-[10px] cursor-pointer" style={{ color: 'var(--text-muted)' }}>
-            What is {meta.shortName}?
-          </summary>
-          <p className="text-[12px] mt-1.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            {meta.explainer}
-          </p>
-        </details>
-      )}
     </div>
   );
 }

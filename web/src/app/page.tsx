@@ -31,9 +31,13 @@ export default function HomePage() {
 
   if (loading && !data) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-4 flex flex-col gap-3">
-        <SkeletonChart height="140px" />
-        <LoadingSkeleton count={3} />
+      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
+        <SkeletonChart height="180px" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <LoadingSkeleton count={1} />
+          <LoadingSkeleton count={1} />
+          <LoadingSkeleton count={1} />
+        </div>
       </div>
     );
   }
@@ -64,58 +68,47 @@ export default function HomePage() {
   let cardIndex = 0;
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-4 flex flex-col gap-3">
-      {/* Header */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ background: 'var(--cta-coral)' }} />
-          <span className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-primary)' }}>
-            NIFTY VOL
-          </span>
+    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
+      {/* 2-column desktop layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left column: Regime + Insights */}
+        <div className="lg:col-span-3 flex flex-col gap-4">
+          <RegimeHero
+            stateScore={db?.state_score ?? null}
+            stressScore={db?.stress_score ?? null}
+            quadrant={db?.quadrant ?? null}
+            trail={data?.trail ?? []}
+          />
+
+          <AnalysisSummary
+            quadrant={db?.quadrant ?? null}
+            insights={db?.insight_bullets_json ?? null}
+            scenarios={db?.scenario_implications_json ?? null}
+          />
+
+          <DataQualityBar quality={db?.data_quality_json ?? null} asOf={db?.as_of ?? null} />
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-[5px] h-[5px] rounded-full glow-dot" style={{ color: 'var(--success)' }} />
-          <span className="mono-value text-[10px]" style={{ color: 'var(--text-faint)' }}>
-            {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST
-          </span>
+
+        {/* Right column: Key Metrics */}
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          {grouped.map(({ category, items }) => (
+            <div key={category}>
+              <div
+                className="text-[9px] uppercase tracking-wider px-1 mb-2"
+                style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-label)', letterSpacing: '0.8px' }}
+              >
+                {category}
+              </div>
+              <div className="flex flex-col gap-2">
+                {items.map((card) => {
+                  cardIndex++;
+                  return <MetricCard key={card.metric_key} card={card} staggerIndex={cardIndex} />;
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Regime Hero */}
-      <RegimeHero
-        stateScore={db?.state_score ?? null}
-        stressScore={db?.stress_score ?? null}
-        quadrant={db?.quadrant ?? null}
-        trail={data?.trail ?? []}
-      />
-
-      {/* Key Metrics */}
-      {grouped.map(({ category, items }) => (
-        <div key={category}>
-          <div
-            className="text-[8px] uppercase tracking-wider px-1 mb-1.5"
-            style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-label)', letterSpacing: '0.8px' }}
-          >
-            {category}
-          </div>
-          <div className="flex flex-col gap-2">
-            {items.map((card) => {
-              cardIndex++;
-              return <MetricCard key={card.metric_key} card={card} staggerIndex={cardIndex} />;
-            })}
-          </div>
-        </div>
-      ))}
-
-      {/* Insights */}
-      <AnalysisSummary
-        quadrant={db?.quadrant ?? null}
-        insights={db?.insight_bullets_json ?? null}
-        scenarios={db?.scenario_implications_json ?? null}
-      />
-
-      {/* Data Quality */}
-      <DataQualityBar quality={db?.data_quality_json ?? null} asOf={db?.as_of ?? null} />
     </div>
   );
 }

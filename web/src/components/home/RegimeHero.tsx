@@ -18,7 +18,7 @@ export default function RegimeHero({ stateScore, stressScore, quadrant, trail }:
   // Build mini sparkline SVG path from trail stress_score values
   const sparkPoints = trail.slice(-7);
   const svgWidth = 200;
-  const svgHeight = 40;
+  const svgHeight = 56;
 
   let sparkPath = '';
   if (sparkPoints.length > 1) {
@@ -102,9 +102,9 @@ export default function RegimeHero({ stateScore, stressScore, quadrant, trail }:
           </div>
         )}
 
-        {/* Tap hint */}
+        {/* Detail hint */}
         <div className="flex items-center justify-end mt-1">
-          <span className="text-[9px]" style={{ color: 'var(--text-faint)' }}>Tap for detail</span>
+          <span className="text-[9px]" style={{ color: 'var(--text-faint)' }}>View detail</span>
           <span className="text-xs ml-1" style={{ color: 'var(--text-faint)' }}>&rsaquo;</span>
         </div>
       </div>
