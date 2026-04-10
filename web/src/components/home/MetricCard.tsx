@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import { getPercentileColor, getPercentileLabel, getMetricMeta } from '@/lib/constants';
-import { formatMetricValue, formatChange, getChangeColor } from '@/lib/formatting';
-import PercentileBar from '@/components/shared/PercentileBar';
+import { getChangeColor } from '@/lib/formatting';
 import type { KeyCard } from '@/types';
 
 interface Props {
