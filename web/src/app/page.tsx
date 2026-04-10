@@ -3,8 +3,8 @@
 import { useCallback } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getDashboardCurrent, getRegimeTrail } from '@/lib/queries';
-import RegimeHero from '@/components/home/RegimeHero';
-import MetricCard from '@/components/home/MetricCard';
+import RegimeMap from '@/components/brief/RegimeMap';
+import KeyMetricCards from '@/components/brief/KeyMetricCards';
 import AnalysisSummary from '@/components/brief/AnalysisSummary';
 import DataQualityBar from '@/components/brief/DataQualityBar';
 import { SkeletonChart } from '@/components/shared/LoadingSkeleton';
@@ -15,8 +15,6 @@ interface HomeData {
   dashboard: DashboardCurrent | null;
   trail: RegimeTrailPoint[];
 }
-
-const CATEGORY_ORDER = ['Volatility Level', 'Surface Shape', 'Surface Momentum'];
 
 export default function HomePage() {
   const fetchHome = useCallback(async (): Promise<HomeData | null> => {
@@ -31,8 +29,8 @@ export default function HomePage() {
 
   if (loading && !data) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
-        <SkeletonChart height="180px" />
+      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
+        <SkeletonChart height="380px" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <LoadingSkeleton count={1} />
           <LoadingSkeleton count={1} />
@@ -43,72 +41,29 @@ export default function HomePage() {
   }
 
   const db = data?.dashboard;
-  const cards = db?.key_cards_json ?? [];
-
-  // Group cards by category in predefined order
-  const grouped: { category: string; items: typeof cards }[] = [];
-  const cardsByCategory = new Map<string, typeof cards>();
-  for (const card of cards) {
-    const cat = card.category || 'Other';
-    const arr = cardsByCategory.get(cat) ?? [];
-    arr.push(card);
-    cardsByCategory.set(cat, arr);
-  }
-  for (const cat of CATEGORY_ORDER) {
-    const items = cardsByCategory.get(cat);
-    if (items) {
-      grouped.push({ category: cat, items });
-      cardsByCategory.delete(cat);
-    }
-  }
-  for (const [cat, items] of cardsByCategory) {
-    grouped.push({ category: cat, items });
-  }
-
-  let cardIndex = 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-6">
-      {/* 2-column desktop layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left column: Regime + Insights */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          <RegimeHero
-            stateScore={db?.state_score ?? null}
-            stressScore={db?.stress_score ?? null}
-            quadrant={db?.quadrant ?? null}
-            trail={data?.trail ?? []}
-          />
+    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
+      {/* Regime Map — full width scatter plot with built-in range selector */}
+      <RegimeMap
+        stateScore={db?.state_score ?? null}
+        stressScore={db?.stress_score ?? null}
+        quadrant={db?.quadrant ?? null}
+        trail={data?.trail ?? []}
+      />
 
-          <AnalysisSummary
-            quadrant={db?.quadrant ?? null}
-            insights={db?.insight_bullets_json ?? null}
-            scenarios={db?.scenario_implications_json ?? null}
-          />
+      {/* Key Metric Cards — 3-column grid with percentile bars */}
+      <KeyMetricCards cards={db?.key_cards_json ?? null} />
 
-          <DataQualityBar quality={db?.data_quality_json ?? null} asOf={db?.as_of ?? null} />
-        </div>
+      {/* Analysis Summary */}
+      <AnalysisSummary
+        quadrant={db?.quadrant ?? null}
+        insights={db?.insight_bullets_json ?? null}
+        scenarios={db?.scenario_implications_json ?? null}
+      />
 
-        {/* Right column: Key Metrics */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          {grouped.map(({ category, items }) => (
-            <div key={category}>
-              <div
-                className="text-[9px] uppercase tracking-wider px-1 mb-2"
-                style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-label)', letterSpacing: '0.8px' }}
-              >
-                {category}
-              </div>
-              <div className="flex flex-col gap-2">
-                {items.map((card) => {
-                  cardIndex++;
-                  return <MetricCard key={card.metric_key} card={card} staggerIndex={cardIndex} />;
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Data Quality */}
+      <DataQualityBar quality={db?.data_quality_json ?? null} asOf={db?.as_of ?? null} />
     </div>
   );
 }

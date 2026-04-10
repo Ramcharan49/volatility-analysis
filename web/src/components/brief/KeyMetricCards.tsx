@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { getPercentileColor, getPercentileLabel } from '@/lib/constants';
 import type { KeyCard } from '@/types';
 
@@ -44,7 +45,6 @@ export default function KeyMetricCards({ cards }: Props) {
       arr.push(card);
       map.set(cat, arr);
     }
-    // Sort by predefined order, then any remaining
     const sorted: [string, KeyCard[]][] = [];
     for (const cat of CATEGORY_ORDER) {
       if (map.has(cat)) {
@@ -88,13 +88,16 @@ export default function KeyMetricCards({ cards }: Props) {
                 </span>
               </div>
 
-              {/* Metric rows */}
+              {/* Metric rows — each links to detail page */}
               {items.map((card) => {
                 const pctColor = getPercentileColor(card.percentile);
                 const pctLabel = getPercentileLabel(card.percentile);
                 return (
-                  <div key={card.metric_key} className="flex flex-col gap-1.5">
-                    {/* Label + percentile value */}
+                  <Link
+                    key={card.metric_key}
+                    href={`/metric/${card.metric_key}`}
+                    className="flex flex-col gap-1.5 rounded-md px-2 py-1.5 -mx-2 transition-colors duration-150 hover:bg-[var(--bg-card-hover)]"
+                  >
                     <div className="flex items-center justify-between">
                       <span
                         className="text-sm"
@@ -109,16 +112,14 @@ export default function KeyMetricCards({ cards }: Props) {
                         {Math.round(card.percentile)}th
                       </span>
                     </div>
-                    {/* Progress bar */}
                     <PercentileBar percentile={card.percentile} />
-                    {/* Interpretation */}
                     <span
                       className="text-xs"
                       style={{ fontFamily: 'var(--font-label)', color: 'var(--text-faint)' }}
                     >
                       {pctLabel}
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
