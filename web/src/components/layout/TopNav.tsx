@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BOTTOM_TABS } from '@/lib/constants';
 import MarketStatusBadge from './MarketStatusBadge';
+import QualityChip from './QualityChip';
 
 function isTabActive(href: string, pathname: string): boolean {
   if (href === '/') return pathname === '/' || pathname === '/brief';
@@ -58,7 +59,10 @@ export default function TopNav() {
         </nav>
       </div>
 
-      <MarketStatusBadge />
+      <div className="flex items-center gap-2">
+        <QualityChip />
+        <MarketStatusBadge />
+      </div>
     </header>
   );
 }
