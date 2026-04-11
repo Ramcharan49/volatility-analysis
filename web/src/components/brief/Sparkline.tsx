@@ -13,9 +13,10 @@ interface Props {
 export default function Sparkline({ data, color, height = 44 }: Props) {
   const option = useMemo<EChartsCoreOption>(() => {
     const points = data.map((v, i) => [i, v]);
+    const lastPoint = points.length > 0 ? points[points.length - 1] : null;
     return {
       animation: false,
-      grid: { top: 4, right: 2, bottom: 4, left: 2, containLabel: false },
+      grid: { top: 6, right: 6, bottom: 4, left: 2, containLabel: false },
       xAxis: {
         type: 'value',
         show: false,
@@ -54,7 +55,26 @@ export default function Sparkline({ data, color, height = 44 }: Props) {
           },
           emphasis: { disabled: true },
           silent: true,
+          z: 2,
         },
+        // "Now" dot — anchors the line to the present moment
+        ...(lastPoint
+          ? [
+              {
+                type: 'scatter' as const,
+                data: [lastPoint],
+                symbol: 'circle',
+                symbolSize: 5,
+                itemStyle: {
+                  color,
+                  shadowColor: color,
+                  shadowBlur: 12,
+                },
+                silent: true,
+                z: 4,
+              },
+            ]
+          : []),
       ],
     };
   }, [data, color]);

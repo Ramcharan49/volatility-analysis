@@ -71,13 +71,23 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
   const accentB = parseInt(accentRgb.slice(4, 6), 16);
   const accentGlow = `rgba(${accentR}, ${accentG}, ${accentB}, 0.55)`;
 
+  // Split recent trail into segments so each can have its own fading opacity → comet tail
+  const trailSegments = recentPoints.length > 1
+    ? recentPoints.slice(0, -1).map((pt, i) => {
+        const next = recentPoints[i + 1];
+        // Normalized position in trail: 0 = oldest, 1 = newest
+        const t = i / Math.max(recentPoints.length - 2, 1);
+        return {
+          points: [pt, next] as number[][],
+          opacity: 0.15 + 0.75 * t, // fades from 0.15 (old) → 0.90 (recent)
+          width: 1.2 + 0.9 * t,      // thickens slightly toward present
+        };
+      })
+    : [];
+
   const option: EChartsCoreOption = {
-    grid: { top: 20, right: 24, bottom: 32, left: 40 },
+    grid: { top: 36, right: 48, bottom: 36, left: 48 },
     xAxis: {
-      name: 'SURFACE STATE →',
-      nameLocation: 'center',
-      nameGap: 22,
-      nameTextStyle: { color: 'var(--text-ghost)', fontSize: 9, fontFamily: 'var(--font-label)', letterSpacing: 1 },
       min: 0,
       max: 100,
       axisLine: { show: false },
@@ -86,11 +96,6 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
       splitLine: { show: false },
     },
     yAxis: {
-      name: 'SURFACE FLOW →',
-      nameLocation: 'center',
-      nameGap: 28,
-      nameRotate: 90,
-      nameTextStyle: { color: 'var(--text-ghost)', fontSize: 9, fontFamily: 'var(--font-label)', letterSpacing: 1 },
       min: -100,
       max: 100,
       axisLine: { show: false },
@@ -107,6 +112,26 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
       extraCssText: 'backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.5);',
     },
     series: [
+      // Center crosshair — faint structural reference without looking like a cage
+      {
+        type: 'line',
+        data: [],
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          label: { show: false },
+          lineStyle: {
+            color: 'rgba(255, 255, 255, 0.06)',
+            width: 1,
+            type: 'solid',
+          },
+          data: [
+            [{ coord: [50, -100] }, { coord: [50, 100] }],
+            [{ coord: [0, 0] }, { coord: [100, 0] }],
+          ],
+        },
+        z: 1,
+      },
       // Historical cloud (faded dots)
       ...(historicalCloud.length > 0
         ? [
@@ -119,7 +144,7 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
               })),
               symbol: 'circle',
               symbolSize: 4,
-              itemStyle: { color: '#6b7280', opacity: 0.12 },
+              itemStyle: { color: '#6b7280', opacity: 0.06 },
               emphasis: {
                 itemStyle: { opacity: 0.5, shadowBlur: 6, shadowColor: 'rgba(107, 114, 128, 0.5)' },
               },
@@ -131,22 +156,22 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
             },
           ]
         : []),
-      // Recent trail line (neon-glow)
-      {
-        type: 'line',
-        data: recentPoints,
+      // Comet-tail trail: each segment has its own opacity, fading from old (faint) → recent (bright)
+      ...trailSegments.map((seg) => ({
+        type: 'line' as const,
+        data: seg.points,
         smooth: 0.25,
         lineStyle: {
           color: accentColor,
-          width: 1.8,
-          opacity: 0.85,
+          width: seg.width,
+          opacity: seg.opacity,
           shadowColor: accentGlow,
-          shadowBlur: 14,
+          shadowBlur: 10 + seg.opacity * 8,
         },
         symbol: 'none',
         silent: true,
         z: 5,
-      },
+      })),
       // Recent trail points (glowing dots, fading into time)
       ...recentPoints.map((pt, i) => {
         const isLast = i === recentPoints.length - 1;
@@ -215,15 +240,15 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
 
   return (
     <div className="glass-tile-static relative h-full min-h-0 p-5 overflow-hidden">
-      {/* Atmospheric quadrant gradients — faint radial auras in each corner */}
+      {/* Atmospheric quadrant gradients — wider, dissipating from corners into center */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background: `
-            radial-gradient(ellipse 60% 50% at 0% 100%, rgba(52, 211, 153, 0.05), transparent 60%),
-            radial-gradient(ellipse 60% 50% at 0% 0%, rgba(251, 191, 36, 0.04), transparent 60%),
-            radial-gradient(ellipse 60% 50% at 100% 100%, rgba(96, 165, 250, 0.04), transparent 60%),
-            radial-gradient(ellipse 60% 50% at 100% 0%, rgba(248, 113, 113, 0.05), transparent 60%)
+            radial-gradient(ellipse 90% 80% at 0% 100%, rgba(52, 211, 153, 0.07), transparent 70%),
+            radial-gradient(ellipse 90% 80% at 0% 0%, rgba(251, 191, 36, 0.06), transparent 70%),
+            radial-gradient(ellipse 90% 80% at 100% 100%, rgba(96, 165, 250, 0.06), transparent 70%),
+            radial-gradient(ellipse 90% 80% at 100% 0%, rgba(248, 113, 113, 0.07), transparent 70%)
           `,
         }}
       />
@@ -238,26 +263,66 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
           }}
         />
         <span
-          className="text-[10px] font-bold tracking-[0.18em] uppercase"
+          className="text-[10px] font-bold tracking-[0.2em] uppercase"
           style={{ fontFamily: 'var(--font-label)', color: regimeConfig.color }}
         >
           {regimeConfig.label}
         </span>
       </div>
 
-      {/* Corner labels — the 4 quadrants */}
-      <div className="absolute inset-0 pointer-events-none">
+      {/* Radar coordinate labels — anchored to axis extremities */}
+      <div className="absolute inset-0 pointer-events-none z-10">
+        {/* Top: RISING (along upper edge of chart grid) */}
         <span
-          className="absolute text-[8px] tracking-[0.15em] uppercase"
-          style={{ top: 20, left: '50%', transform: 'translateX(-50%)', color: 'var(--text-ghost)', fontFamily: 'var(--font-label)' }}
+          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
+          style={{
+            top: 14,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: 'var(--text-ghost)',
+            fontFamily: 'var(--font-label)',
+          }}
         >
-          Rising Vol
+          ↑ Rising
         </span>
+        {/* Bottom: DECLINING */}
         <span
-          className="absolute text-[8px] tracking-[0.15em] uppercase"
-          style={{ bottom: 36, left: '50%', transform: 'translateX(-50%)', color: 'var(--text-ghost)', fontFamily: 'var(--font-label)' }}
+          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
+          style={{
+            bottom: 14,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: 'var(--text-ghost)',
+            fontFamily: 'var(--font-label)',
+          }}
         >
-          Declining Vol
+          ↓ Declining
+        </span>
+        {/* Left: LOW VOL — vertically centered, written horizontally */}
+        <span
+          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
+          style={{
+            top: '50%',
+            left: 10,
+            transform: 'translateY(-50%)',
+            color: 'var(--text-ghost)',
+            fontFamily: 'var(--font-label)',
+          }}
+        >
+          ← Low
+        </span>
+        {/* Right: HIGH VOL */}
+        <span
+          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
+          style={{
+            top: '50%',
+            right: 12,
+            transform: 'translateY(-50%)',
+            color: 'var(--text-ghost)',
+            fontFamily: 'var(--font-label)',
+          }}
+        >
+          High →
         </span>
       </div>
 
