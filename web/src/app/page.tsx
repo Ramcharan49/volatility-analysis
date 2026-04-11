@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getDashboardCurrent, getRegimeTrail, getMetricSeries } from '@/lib/queries';
 import { getMetricMeta } from '@/lib/constants';
 import RegimeMap from '@/components/brief/RegimeMap';
 import BentoGrid from '@/components/brief/BentoGrid';
 import MetricTile from '@/components/brief/MetricTile';
+import SummaryDrawer from '@/components/brief/SummaryDrawer';
+import AnalysisSummary from '@/components/brief/AnalysisSummary';
 import type { DashboardCurrent, RegimeTrailPoint, MetricRow } from '@/types';
 
 interface HomeData {
@@ -31,6 +33,7 @@ export default function HomePage() {
   }, []);
 
   const { data, loading } = usePolling<HomeData>(fetchHome);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const { seriesByKey, cardByKey } = useMemo(() => {
     const byKey = new Map<string, number[]>();
@@ -107,21 +110,47 @@ export default function HomePage() {
           </BentoGrid>
         </div>
 
-        {/* Summary button placeholder — Phase 2 wires to slide-out panel */}
+        {/* Insights trigger — glass icon button, bottom-right */}
         <button
           type="button"
-          className="self-end text-[10px] tracking-[0.18em] uppercase px-3 py-1.5 rounded-full transition-colors"
+          onClick={() => setSummaryOpen(true)}
+          className="self-end flex items-center justify-center rounded-full transition-colors"
           style={{
-            fontFamily: 'var(--font-label)',
-            color: 'var(--text-secondary)',
+            width: 36,
+            height: 36,
             background: 'var(--glass-bg)',
             border: '1px solid var(--glass-border)',
+            color: 'var(--text-secondary)',
           }}
-          disabled
+          aria-label="Open insights summary"
         >
-          Summary ↗
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          >
+            <path d="M3 10V13" />
+            <path d="M8 5V13" />
+            <path d="M13 8V13" />
+          </svg>
         </button>
       </div>
+
+      <SummaryDrawer
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        quadrant={db?.quadrant ?? null}
+      >
+        <AnalysisSummary
+          quadrant={db?.quadrant ?? null}
+          insights={db?.insight_bullets_json ?? null}
+          scenarios={db?.scenario_implications_json ?? null}
+        />
+      </SummaryDrawer>
     </div>
   );
 }
