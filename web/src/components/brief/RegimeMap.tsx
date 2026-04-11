@@ -19,13 +19,6 @@ const RANGE_DAYS: Record<TrailRange, number> = {
 
 const RECENT_TRAIL_DAYS = 7;
 
-const QUADRANT_LEGEND: { key: Quadrant; desc: string }[] = [
-  { key: 'Transition', desc: 'Low vol · Rising' },
-  { key: 'Stress', desc: 'High vol · Rising' },
-  { key: 'Calm', desc: 'Low vol · Declining' },
-  { key: 'Compression', desc: 'High vol · Declining' },
-];
-
 interface Props {
   stateScore: number | null;
   stressScore: number | null;
@@ -39,7 +32,7 @@ function formatDate(dateStr: string): string {
 }
 
 export default function RegimeMap({ stateScore, stressScore, quadrant, trail: initialTrail }: Props) {
-  const [range, setRange] = useState<TrailRange>('1M');
+  const [range] = useState<TrailRange>('1M');
 
   const fetchExtended = useCallback(async () => {
     if (range === '7D') return null;
@@ -71,79 +64,49 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
   const q = (quadrant as Quadrant) ?? 'Calm';
   const regimeConfig = QUADRANT_CONFIG[q] ?? QUADRANT_CONFIG.Calm;
 
+  const accentColor = regimeConfig.color;
+  const accentRgb = accentColor.replace('#', '');
+  const accentR = parseInt(accentRgb.slice(0, 2), 16);
+  const accentG = parseInt(accentRgb.slice(2, 4), 16);
+  const accentB = parseInt(accentRgb.slice(4, 6), 16);
+  const accentGlow = `rgba(${accentR}, ${accentG}, ${accentB}, 0.55)`;
+
   const option: EChartsCoreOption = {
-    grid: { top: 16, right: 24, bottom: 44, left: 52 },
+    grid: { top: 20, right: 24, bottom: 32, left: 40 },
     xAxis: {
-      name: 'SURFACE STATE → (Volatility Level)',
+      name: 'SURFACE STATE →',
       nameLocation: 'center',
-      nameGap: 30,
-      nameTextStyle: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-label)', letterSpacing: 1 },
+      nameGap: 22,
+      nameTextStyle: { color: 'var(--text-ghost)', fontSize: 9, fontFamily: 'var(--font-label)', letterSpacing: 1 },
       min: 0,
       max: 100,
-      axisLine: { lineStyle: { color: '#212121' } },
+      axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-mono)' },
+      axisLabel: { show: false },
       splitLine: { show: false },
     },
     yAxis: {
-      name: 'SURFACE FLOW → (Volatility Change)',
+      name: 'SURFACE FLOW →',
       nameLocation: 'center',
-      nameGap: 40,
-      nameTextStyle: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-label)', letterSpacing: 1 },
+      nameGap: 28,
+      nameRotate: 90,
+      nameTextStyle: { color: 'var(--text-ghost)', fontSize: 9, fontFamily: 'var(--font-label)', letterSpacing: 1 },
       min: -100,
       max: 100,
-      axisLine: { lineStyle: { color: '#212121' } },
+      axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: '#595959', fontSize: 10, fontFamily: 'var(--font-mono)' },
+      axisLabel: { show: false },
       splitLine: { show: false },
     },
     tooltip: {
-      backgroundColor: 'rgba(33, 33, 33, 0.95)',
-      borderColor: '#353535',
-      textStyle: { color: '#ffffff', fontSize: 12 },
+      backgroundColor: 'rgba(10, 10, 13, 0.85)',
+      borderColor: 'rgba(255, 255, 255, 0.08)',
+      borderWidth: 1,
+      padding: [8, 12],
+      textStyle: { color: '#f5f5f7', fontSize: 11, fontFamily: 'var(--font-mono)' },
+      extraCssText: 'backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.5);',
     },
     series: [
-      // Quadrant backgrounds
-      {
-        type: 'scatter',
-        data: [],
-        markArea: {
-          silent: true,
-          data: [
-            [
-              { xAxis: 0, yAxis: -100, itemStyle: { color: QUADRANT_CONFIG.Calm.bg } },
-              { xAxis: 50, yAxis: 0 },
-            ],
-            [
-              { xAxis: 0, yAxis: 0, itemStyle: { color: QUADRANT_CONFIG.Transition.bg } },
-              { xAxis: 50, yAxis: 100 },
-            ],
-            [
-              { xAxis: 50, yAxis: -100, itemStyle: { color: QUADRANT_CONFIG.Compression.bg } },
-              { xAxis: 100, yAxis: 0 },
-            ],
-            [
-              { xAxis: 50, yAxis: 0, itemStyle: { color: QUADRANT_CONFIG.Stress.bg } },
-              { xAxis: 100, yAxis: 100 },
-            ],
-          ],
-        },
-      },
-      // Crosshair lines
-      {
-        type: 'line',
-        data: [[50, -100], [50, 100]],
-        lineStyle: { color: '#212121', width: 1, type: 'dashed' },
-        symbol: 'none',
-        z: 1,
-      },
-      {
-        type: 'line',
-        data: [[0, 0], [100, 0]],
-        lineStyle: { color: '#212121', width: 1, type: 'dashed' },
-        symbol: 'none',
-        z: 1,
-      },
       // Historical cloud (faded dots)
       ...(historicalCloud.length > 0
         ? [
@@ -155,78 +118,78 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
                 date: p.date,
               })),
               symbol: 'circle',
-              symbolSize: 5,
-              itemStyle: { color: '#595959', opacity: 0.15 },
+              symbolSize: 4,
+              itemStyle: { color: '#6b7280', opacity: 0.12 },
               emphasis: {
-                itemStyle: { opacity: 0.6, shadowBlur: 8, shadowColor: 'rgba(89, 89, 89, 0.5)' },
+                itemStyle: { opacity: 0.5, shadowBlur: 6, shadowColor: 'rgba(107, 114, 128, 0.5)' },
               },
               tooltip: {
                 formatter: (params: { value: number[]; data: { date: string } }) =>
-                  `<strong>${formatDate(params.data.date)}</strong><br/>State: ${params.value[0]?.toFixed(1)}<br/>Stress: ${params.value[1]?.toFixed(1)}`,
+                  `<strong>${formatDate(params.data.date)}</strong><br/>State ${params.value[0]?.toFixed(1)} · Stress ${params.value[1]?.toFixed(1)}`,
               },
               z: 2,
             },
           ]
         : []),
-      // Recent trail line
+      // Recent trail line (neon-glow)
       {
         type: 'line',
         data: recentPoints,
-        lineStyle: { color: '#0052ef', width: 1.5, type: 'dashed', opacity: 0.5 },
+        smooth: 0.25,
+        lineStyle: {
+          color: accentColor,
+          width: 1.8,
+          opacity: 0.85,
+          shadowColor: accentGlow,
+          shadowBlur: 14,
+        },
         symbol: 'none',
+        silent: true,
         z: 5,
       },
-      // Recent trail points
+      // Recent trail points (glowing dots, fading into time)
       ...recentPoints.map((pt, i) => {
         const isLast = i === recentPoints.length - 1;
-        const isFirst = i === 0;
-        const opacity = 0.4 + 0.6 * (i / Math.max(recentPoints.length - 1, 1));
+        const opacity = 0.35 + 0.65 * (i / Math.max(recentPoints.length - 1, 1));
         return {
           type: 'scatter' as const,
           data: [pt],
           symbol: 'circle',
-          symbolSize: isLast ? 12 : 6 + (i / recentPoints.length) * 4,
+          symbolSize: isLast ? 14 : 5 + (i / recentPoints.length) * 3,
           itemStyle: {
-            color: isLast ? '#0052ef' : 'transparent',
-            borderColor: '#0052ef',
-            borderWidth: isLast ? 3 : 2,
+            color: isLast ? accentColor : 'transparent',
+            borderColor: accentColor,
+            borderWidth: isLast ? 0 : 1.5,
             opacity,
             ...(isLast
-              ? { shadowBlur: 20, shadowColor: 'rgba(0, 82, 239, 0.6)' }
+              ? { shadowBlur: 24, shadowColor: accentGlow }
               : {}),
           },
           emphasis: {
-            itemStyle: { shadowBlur: 16, shadowColor: 'rgba(0, 82, 239, 0.5)' },
+            itemStyle: { shadowBlur: 18, shadowColor: accentGlow },
           },
           z: 10,
-          label: {
-            show: isLast || isFirst || recentPoints.length <= 5,
-            position: 'top' as const,
-            formatter: recentDates[i] ?? '',
-            color: isLast ? '#0052ef' : '#797979',
-            fontSize: 9,
-            fontFamily: 'var(--font-label)',
-            distance: 10,
-          },
           tooltip: {
             formatter: () =>
-              `<strong>${recentDates[i]}</strong><br/>State: ${(pt as number[])[0]?.toFixed(1)}<br/>Stress: ${(pt as number[])[1]?.toFixed(1)}`,
+              `<strong>${recentDates[i]}</strong><br/>State ${(pt as number[])[0]?.toFixed(1)} · Stress ${(pt as number[])[1]?.toFixed(1)}`,
           },
         };
       }),
-      // Glow ring around current position
+      // Outer glow rings around current position
       ...(recentPoints.length > 0
         ? [
             {
               type: 'scatter' as const,
               data: [recentPoints[recentPoints.length - 1]],
               symbol: 'circle',
-              symbolSize: 24,
+              symbolSize: 28,
               itemStyle: {
                 color: 'transparent',
-                borderColor: '#0052ef',
+                borderColor: accentColor,
                 borderWidth: 1,
-                opacity: 0.3,
+                opacity: 0.35,
+                shadowBlur: 16,
+                shadowColor: accentGlow,
               },
               z: 9,
               silent: true,
@@ -235,10 +198,10 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
               type: 'scatter' as const,
               data: [recentPoints[recentPoints.length - 1]],
               symbol: 'circle',
-              symbolSize: 36,
+              symbolSize: 44,
               itemStyle: {
                 color: 'transparent',
-                borderColor: '#0052ef',
+                borderColor: accentColor,
                 borderWidth: 1,
                 opacity: 0.12,
               },
@@ -251,98 +214,56 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
   };
 
   return (
-    <div className="card p-5 animate-in stagger-1">
-      {/* Header row: title + trail selector + regime badge */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <span
-            className="text-xs font-semibold tracking-widest uppercase"
-            style={{ fontFamily: 'var(--font-label)', color: 'var(--text-muted)' }}
-          >
-            Volatility Regime Indicator
-          </span>
-          <div className="toggle-group">
-            {(['7D', '1M', '3M', '1Y'] as TrailRange[]).map((r) => (
-              <button
-                key={r}
-                className={`toggle-btn ${range === r ? 'active' : ''}`}
-                onClick={() => setRange(r)}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* Regime badge */}
+    <div className="glass-tile-static relative h-full min-h-0 p-5 overflow-hidden">
+      {/* Atmospheric quadrant gradients — faint radial auras in each corner */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `
+            radial-gradient(ellipse 60% 50% at 0% 100%, rgba(52, 211, 153, 0.05), transparent 60%),
+            radial-gradient(ellipse 60% 50% at 0% 0%, rgba(251, 191, 36, 0.04), transparent 60%),
+            radial-gradient(ellipse 60% 50% at 100% 100%, rgba(96, 165, 250, 0.04), transparent 60%),
+            radial-gradient(ellipse 60% 50% at 100% 0%, rgba(248, 113, 113, 0.05), transparent 60%)
+          `,
+        }}
+      />
+
+      {/* Regime label — absolute top-left */}
+      <div className="absolute top-4 left-5 z-10 flex items-center gap-2">
         <div
-          className="flex items-center gap-2 px-4 py-2 rounded-lg"
+          className="w-1.5 h-1.5 rounded-full"
           style={{
-            border: `1px solid ${regimeConfig.color}30`,
-            background: regimeConfig.bg,
+            background: regimeConfig.color,
+            boxShadow: `0 0 10px ${regimeConfig.color}, 0 0 4px ${regimeConfig.color}`,
           }}
+        />
+        <span
+          className="text-[10px] font-bold tracking-[0.18em] uppercase"
+          style={{ fontFamily: 'var(--font-label)', color: regimeConfig.color }}
         >
-          <div
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ background: regimeConfig.color, boxShadow: `0 0 8px ${regimeConfig.color}60` }}
-          />
-          <span
-            className="text-sm font-bold tracking-wide uppercase"
-            style={{ fontFamily: 'var(--font-label)', color: regimeConfig.color }}
-          >
-            {regimeConfig.label}
-          </span>
-        </div>
+          {regimeConfig.label}
+        </span>
+      </div>
+
+      {/* Corner labels — the 4 quadrants */}
+      <div className="absolute inset-0 pointer-events-none">
+        <span
+          className="absolute text-[8px] tracking-[0.15em] uppercase"
+          style={{ top: 20, left: '50%', transform: 'translateX(-50%)', color: 'var(--text-ghost)', fontFamily: 'var(--font-label)' }}
+        >
+          Rising Vol
+        </span>
+        <span
+          className="absolute text-[8px] tracking-[0.15em] uppercase"
+          style={{ bottom: 36, left: '50%', transform: 'translateX(-50%)', color: 'var(--text-ghost)', fontFamily: 'var(--font-label)' }}
+        >
+          Declining Vol
+        </span>
       </div>
 
       {/* Chart */}
-      <ChartContainer option={option} height="380px" />
-
-      {/* Bottom legend */}
-      <div className="flex items-center justify-between mt-3 px-2">
-        <div className="flex items-center gap-5">
-          {QUADRANT_LEGEND.map(({ key, desc }) => {
-            const cfg = QUADRANT_CONFIG[key];
-            return (
-              <div key={key} className="flex items-center gap-1.5">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: cfg.color }}
-                />
-                <span className="text-[0.65rem] font-medium uppercase tracking-wide" style={{ fontFamily: 'var(--font-label)', color: cfg.color }}>
-                  {cfg.label}
-                </span>
-                <span className="text-[0.6rem]" style={{ color: 'var(--text-faint)' }}>
-                  ({desc})
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-0.5">
-              {[0.2, 0.4, 0.7, 1].map((op, i) => (
-                <div
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: '#0052ef', opacity: op }}
-                />
-              ))}
-            </div>
-            <span className="text-[0.6rem]" style={{ color: 'var(--text-faint)' }}>
-              Historical trail
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: '#0052ef', boxShadow: '0 0 6px rgba(6,182,212,0.5)' }}
-            />
-            <span className="text-[0.6rem]" style={{ color: 'var(--text-faint)' }}>
-              Current regime
-            </span>
-          </div>
-        </div>
+      <div className="relative h-full pt-1">
+        <ChartContainer option={option} height="100%" />
       </div>
     </div>
   );
