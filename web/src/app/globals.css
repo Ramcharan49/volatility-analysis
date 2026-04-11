@@ -405,6 +405,14 @@ body {
     0 0 20px rgba(74, 216, 255, 0.25);
 }
 
+/* Reverse cross-pollination: when the regime dot is hovered, all tiles glow subtly */
+.glass-tile[data-regime-hovered="true"] {
+  border-color: var(--glass-border-hover);
+  background:
+    var(--glass-edge-light),
+    var(--glass-bg-hover);
+}
+
 .glass-tile-static {
   position: relative;
   background:

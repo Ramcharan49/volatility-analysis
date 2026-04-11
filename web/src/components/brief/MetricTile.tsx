@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { motion, type Variants } from 'framer-motion';
 import Sparkline from './Sparkline';
 import CountUpNumber from './CountUpNumber';
-import { getPercentileColor } from '@/lib/constants';
+import { getPercentileColor, getMetricMeta } from '@/lib/constants';
+import { formatMetricValue } from '@/lib/formatting';
+import { useHover } from './HoverContext';
 import type { MetricFormat } from '@/types';
 
 interface SecondaryReading {
@@ -45,6 +47,20 @@ export default function MetricTile({
   const pctText = percentile != null ? `P${Math.round(percentile)}` : '--';
   const railPosition = percentile != null ? Math.max(0, Math.min(100, percentile)) : null;
 
+  const { setHovered, regimeHovered } = useHover();
+  const meta = getMetricMeta(metricKey);
+
+  const handleHoverStart = () => {
+    setHovered({
+      key: metricKey,
+      displayName: meta.displayName,
+      valueText: formatMetricValue(value, format),
+      percentile,
+      color: pctColor,
+    });
+  };
+  const handleHoverEnd = () => setHovered(null);
+
   return (
     <motion.div
       variants={itemVariants}
@@ -53,11 +69,14 @@ export default function MetricTile({
         scale: 1.012,
         transition: { type: 'spring', stiffness: 380, damping: 26 },
       }}
+      onHoverStart={handleHoverStart}
+      onHoverEnd={handleHoverEnd}
       className="min-h-0"
     >
       <Link
         href={`/metric/${metricKey}`}
         className="glass-tile group relative flex flex-col justify-between p-6 min-h-0 h-full"
+        data-regime-hovered={regimeHovered ? 'true' : undefined}
         style={{ textDecoration: 'none' }}
       >
         {/* Category label */}

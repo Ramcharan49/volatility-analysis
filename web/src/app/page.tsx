@@ -9,6 +9,7 @@ import BentoGrid from '@/components/brief/BentoGrid';
 import MetricTile from '@/components/brief/MetricTile';
 import SummaryDrawer from '@/components/brief/SummaryDrawer';
 import AnalysisSummary from '@/components/brief/AnalysisSummary';
+import { HoverProvider } from '@/components/brief/HoverContext';
 import type { DashboardCurrent, RegimeTrailPoint, MetricRow } from '@/types';
 
 interface HomeData {
@@ -88,6 +89,7 @@ export default function HomePage() {
   };
 
   return (
+    <HoverProvider>
     <div className="h-full w-full px-6 py-5 grid gap-5 min-h-0" style={{ gridTemplateColumns: '65fr 35fr' }}>
       {/* Left: Regime Map (65%) */}
       <div className="min-h-0 min-w-0">
@@ -152,5 +154,6 @@ export default function HomePage() {
         />
       </SummaryDrawer>
     </div>
+    </HoverProvider>
   );
 }

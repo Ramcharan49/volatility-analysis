@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import ChartContainer from '@/components/shared/ChartContainer';
 import { QUADRANT_CONFIG } from '@/lib/constants';
 import { getRegimeTrail } from '@/lib/queries';
 import { usePolling } from '@/hooks/usePolling';
+import { useHover } from './HoverContext';
 import type { Quadrant, RegimeTrailPoint } from '@/types';
 import type { EChartsCoreOption } from 'echarts/core';
 
@@ -41,6 +42,7 @@ function formatDate(dateStr: string): string {
 
 export default function RegimeMap({ stateScore, stressScore, quadrant, trail: initialTrail }: Props) {
   const [range] = useState<TrailRange>('1M');
+  const { hovered, setRegimeHovered } = useHover();
 
   const fetchExtended = useCallback(async () => {
     if (range === '7D') return null;
@@ -358,7 +360,15 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
 
       {/* Chart */}
       <div className="relative h-full">
-        <ChartContainer option={option} height="100%" />
+        {/* Canvas layer that dims when a metric tile is hovered */}
+        <div
+          className="absolute inset-0 transition-all duration-300"
+          style={{
+            filter: hovered ? 'brightness(0.55) saturate(0.7)' : 'none',
+          }}
+        >
+          <ChartContainer option={option} height="100%" />
+        </div>
 
         {/* Breathing pulse ring over the current regime dot */}
         {breathDot && (
@@ -375,6 +385,66 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
             aria-hidden="true"
           />
         )}
+
+        {/* Hit target over the current regime dot — drives reverse link */}
+        {breathDot && (
+          <div
+            className="absolute cursor-default"
+            style={{
+              left: breathDot.left,
+              top: breathDot.top,
+              width: 56,
+              height: 56,
+              transform: 'translate(-50%, -50%)',
+              borderRadius: '50%',
+            }}
+            onMouseEnter={() => setRegimeHovered(true)}
+            onMouseLeave={() => setRegimeHovered(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Cross-pollination callout — shows which metric is being inspected */}
+        <AnimatePresence>
+          {hovered && (
+            <motion.div
+              className="absolute top-4 right-4 z-20 px-4 py-3 rounded-xl pointer-events-none"
+              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] as const }}
+              style={{
+                background: 'rgba(10, 10, 13, 0.72)',
+                border: '1px solid var(--glass-border-hover)',
+                backdropFilter: 'blur(18px) saturate(1.35)',
+                WebkitBackdropFilter: 'blur(18px) saturate(1.35)',
+                boxShadow: '0 12px 36px rgba(0,0,0,0.55)',
+                minWidth: 148,
+              }}
+            >
+              <div
+                className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1"
+                style={{ fontFamily: 'var(--font-label)', color: 'var(--text-ghost)' }}
+              >
+                {hovered.displayName}
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span
+                  className="text-hero text-[20px]"
+                  style={{ fontWeight: 600 }}
+                >
+                  {hovered.valueText}
+                </span>
+                <span
+                  className="mono-value text-[11px] font-semibold"
+                  style={{ color: hovered.color }}
+                >
+                  {hovered.percentile != null ? `P${Math.round(hovered.percentile)}` : '--'}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
