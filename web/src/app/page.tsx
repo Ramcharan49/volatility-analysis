@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { usePolling } from '@/hooks/usePolling';
 import { getDashboardCurrent, getRegimeTrail, getMetricSeries } from '@/lib/queries';
 import { getMetricMeta } from '@/lib/constants';
@@ -36,13 +37,32 @@ export default function HomePage() {
   const { data, loading } = usePolling<HomeData>(fetchHome);
   const [summaryOpen, setSummaryOpen] = useState(false);
 
-  const { seriesByKey, cardByKey } = useMemo(() => {
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = useCallback((key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const { seriesByKey, cardByKey, timeSeriesByKey } = useMemo(() => {
     const byKey = new Map<string, number[]>();
+    const tsByKey = new Map<string, { ts: string; value: number }[]>();
     for (const row of data?.series ?? []) {
       if (row.value == null) continue;
+      const val = Number(row.value);
       const arr = byKey.get(row.metric_key) ?? [];
-      arr.push(Number(row.value));
+      arr.push(val);
       byKey.set(row.metric_key, arr);
+      const tsArr = tsByKey.get(row.metric_key) ?? [];
+      tsArr.push({ ts: row.ts, value: val });
+      tsByKey.set(row.metric_key, tsArr);
     }
     const cards = new Map<string, { value: number | null; percentile: number | null }>();
     for (const card of data?.dashboard?.key_cards_json ?? []) {
@@ -51,7 +71,7 @@ export default function HomePage() {
         percentile: card.percentile != null ? Number(card.percentile) : null,
       });
     }
-    return { seriesByKey: byKey, cardByKey: cards };
+    return { seriesByKey: byKey, cardByKey: cards, timeSeriesByKey: tsByKey };
   }, [data]);
 
   if (loading && !data) {
@@ -79,6 +99,9 @@ export default function HomePage() {
         format={meta.format}
         percentile={card?.percentile ?? null}
         series={seriesByKey.get(key) ?? []}
+        expanded={expandedKeys.has(key)}
+        onToggle={() => toggleExpanded(key)}
+        timeSeries={timeSeriesByKey.get(key) ?? []}
         secondary={
           secondary && secondaryCard
             ? { label: secondary.label, percentile: secondaryCard.percentile }
@@ -112,17 +135,22 @@ export default function HomePage() {
           </BentoGrid>
         </div>
 
-        {/* Insights trigger — glass icon button, bottom-right */}
-        <button
+        {/* Insights trigger — glass icon button with spring-lift, bottom-right */}
+        <motion.button
           type="button"
           onClick={() => setSummaryOpen(true)}
-          className="self-end flex items-center justify-center rounded-full transition-colors"
+          whileHover={{
+            y: -3,
+            scale: 1.012,
+            transition: { type: 'spring', stiffness: 380, damping: 26 },
+          }}
+          className="glass-tile-static self-end flex items-center justify-center"
           style={{
             width: 36,
             height: 36,
-            background: 'var(--glass-bg)',
-            border: '1px solid var(--glass-border)',
+            borderRadius: 9999,
             color: 'var(--text-secondary)',
+            cursor: 'pointer',
           }}
           aria-label="Open insights summary"
         >
@@ -139,7 +167,7 @@ export default function HomePage() {
             <path d="M8 5V13" />
             <path d="M13 8V13" />
           </svg>
-        </button>
+        </motion.button>
       </div>
 
       <SummaryDrawer
