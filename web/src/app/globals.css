@@ -66,6 +66,26 @@
   --font-size-hero: 32px;
   --font-size-value: 18px;
   --font-size-label: 9px;
+
+  /* ── Premium Design — Void, Glass, Neon ─────────────── */
+  --void-canvas: #0a0a0d;
+  --void-canvas-deep: #050507;
+
+  --glass-bg: rgba(255, 255, 255, 0.02);
+  --glass-bg-hover: rgba(255, 255, 255, 0.035);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-hover: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45), 0 1px 0 0 rgba(255, 255, 255, 0.04) inset;
+  --glass-shadow-hover: 0 14px 48px 0 rgba(0, 0, 0, 0.55), 0 1px 0 0 rgba(255, 255, 255, 0.08) inset;
+
+  --text-hero: #f5f5f7;
+  --text-ghost: #4a4a52;
+
+  --neon-cyan: #4ad8ff;
+  --neon-amber: #ffb84d;
+  --neon-red: #ff5566;
+  --neon-green: #4dffaa;
+  --neon-purple: #b48dff;
 }
 
 @theme inline {
@@ -78,7 +98,10 @@
 /* ── Base ──────────────────────────────────────────────── */
 
 body {
-  background: var(--bg-primary);
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(74, 216, 255, 0.025), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 100%, rgba(180, 141, 255, 0.02), transparent 60%),
+    var(--void-canvas);
   color: var(--text-primary);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -323,8 +346,65 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-sm) 24px;
-  background: rgba(11, 11, 11, 0.85);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  border-bottom: 1px solid var(--border-primary);
+  background: rgba(10, 10, 13, 0.75);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* ── Frosted Glass Tile ───────────────────────────────── */
+
+.glass-tile {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  transition:
+    box-shadow 220ms var(--spring-easing),
+    border-color 220ms var(--spring-easing),
+    background 220ms var(--spring-easing),
+    transform 220ms var(--spring-easing);
+  will-change: transform, box-shadow;
+}
+
+.glass-tile:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.glass-tile-static {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+}
+
+/* ── Neon Glow Utility ────────────────────────────────── */
+
+.neon-glow {
+  filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 2px currentColor);
+}
+
+/* ── Hero Typography ──────────────────────────────────── */
+
+.text-hero {
+  color: var(--text-hero);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "ss01";
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+}
+
+.text-ghost {
+  color: var(--text-ghost);
+  font-family: var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
