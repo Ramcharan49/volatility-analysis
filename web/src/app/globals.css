@@ -454,3 +454,26 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+
+/* ── Regime breath pulse ─────────────────────────────── */
+
+@keyframes regime-breath {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.35;
+    box-shadow: 0 0 14px var(--breath-glow, rgba(255, 255, 255, 0.4));
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.22);
+    opacity: 0.75;
+    box-shadow: 0 0 32px var(--breath-glow, rgba(255, 255, 255, 0.6));
+  }
+}
+
+.regime-breath-pulse {
+  border: 1px solid;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  animation: regime-breath 2.5s ease-in-out infinite;
+  will-change: transform, opacity, box-shadow;
+}

@@ -1,12 +1,20 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import ChartContainer from '@/components/shared/ChartContainer';
 import { QUADRANT_CONFIG } from '@/lib/constants';
 import { getRegimeTrail } from '@/lib/queries';
 import { usePolling } from '@/hooks/usePolling';
 import type { Quadrant, RegimeTrailPoint } from '@/types';
 import type { EChartsCoreOption } from 'echarts/core';
+
+// ECharts grid insets — must match grid option below so the breath overlay
+// can be positioned at the correct data coordinate.
+const GRID_TOP = 36;
+const GRID_RIGHT = 48;
+const GRID_BOTTOM = 36;
+const GRID_LEFT = 48;
 
 type TrailRange = '7D' | '1M' | '3M' | '1Y';
 
@@ -86,7 +94,12 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
     : [];
 
   const option: EChartsCoreOption = {
-    grid: { top: 36, right: 48, bottom: 36, left: 48 },
+    animation: true,
+    animationDuration: 800,
+    animationEasing: 'cubicOut',
+    animationDurationUpdate: 400,
+    animationEasingUpdate: 'cubicOut',
+    grid: { top: GRID_TOP, right: GRID_RIGHT, bottom: GRID_BOTTOM, left: GRID_LEFT },
     xAxis: {
       min: 0,
       max: 100,
@@ -238,8 +251,25 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
     ],
   };
 
+  // Compute pixel position of current regime dot within the chart plot area
+  // so we can overlay a breath-pulse ring on it (purely CSS, no ECharts redraw).
+  const breathDot = (() => {
+    if (stateScore == null || stressScore == null) return null;
+    const xPct = Math.max(0, Math.min(100, stateScore)) / 100;
+    const yPct = (100 - Math.max(-100, Math.min(100, stressScore))) / 200;
+    return {
+      left: `calc(${GRID_LEFT}px + (100% - ${GRID_LEFT + GRID_RIGHT}px) * ${xPct})`,
+      top: `calc(${GRID_TOP}px + (100% - ${GRID_TOP + GRID_BOTTOM}px) * ${yPct})`,
+    };
+  })();
+
   return (
-    <div className="glass-tile-static relative h-full min-h-0 p-5 overflow-hidden">
+    <motion.div
+      className="glass-tile-static relative h-full min-h-0 p-5 overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] as const }}
+    >
       {/* Atmospheric quadrant gradients — wider, dissipating from corners into center */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -327,9 +357,25 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
       </div>
 
       {/* Chart */}
-      <div className="relative h-full pt-1">
+      <div className="relative h-full">
         <ChartContainer option={option} height="100%" />
+
+        {/* Breathing pulse ring over the current regime dot */}
+        {breathDot && (
+          <div
+            className="regime-breath-pulse pointer-events-none absolute rounded-full"
+            style={{
+              left: breathDot.left,
+              top: breathDot.top,
+              width: 44,
+              height: 44,
+              borderColor: accentColor,
+              ['--breath-glow' as string]: accentGlow,
+            }}
+            aria-hidden="true"
+          />
+        )}
       </div>
-    </div>
+    </motion.div>
   );
 }
