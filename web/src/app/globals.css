@@ -413,6 +413,15 @@ body {
     var(--glass-bg-hover);
 }
 
+.glass-tile[data-expanded="true"] {
+  border-color: var(--glass-border-hover);
+  background: var(--glass-bg-hover);
+  box-shadow: var(--glass-shadow-hover);
+}
+.glass-tile[data-expanded="true"]:hover {
+  transform: none;
+}
+
 .glass-tile-static {
   position: relative;
   background:
