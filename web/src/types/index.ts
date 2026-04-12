@@ -106,4 +106,15 @@ export interface MetricMeta {
    * Mirrors worker/percentile.py _STRESS_DIRECTION_ALIGNS.
    */
   stressDirection?: 1 | -1;
+  /**
+   * Visual treatment for the percentile bar.
+   *   undefined (default) — linear fill from the left edge; magnitude only.
+   *   'diverging'         — track anchored at 50% centre; fill extends left
+   *                         for percentiles below 50 and right for percentiles
+   *                         above 50. Distance from centre = magnitude, side =
+   *                         direction. Use only for signed flow metrics where
+   *                         direction carries meaning (e.g., 1-day change
+   *                         percentiles).
+   */
+  flowDisplay?: 'diverging';
 }

@@ -297,7 +297,13 @@ export const METRIC_REGISTRY: Record<string, MetricMeta> = {
     format: 'pct',
     relatedKeys: [],
     spreadKey: null,
-    explainer: 'One-day change in 30D ATM implied volatility.',
+    explainer:
+      'One-day change in 30D ATM implied volatility. Percentile compares ' +
+      'today\u2019s signed change against the historical distribution of 1-day ' +
+      'changes. Displayed on a diverging bar so direction and magnitude are ' +
+      'both visible: right-of-centre = vol rising (stress building), ' +
+      'left-of-centre = vol easing.',
+    flowDisplay: 'diverging',
   },
   d_rr25_30d_1d: {
     key: 'd_rr25_30d_1d',
@@ -309,7 +315,13 @@ export const METRIC_REGISTRY: Record<string, MetricMeta> = {
     format: 'raw',
     relatedKeys: [],
     spreadKey: null,
-    explainer: 'One-day change in 30D 25-delta risk reversal.',
+    explainer:
+      'One-day change in 30D 25-delta risk reversal. Stress-aligned so that ' +
+      'right-of-centre = downside fear expanding (RR becoming more negative) ' +
+      'and left-of-centre = fear receding. Matches the inversion convention ' +
+      'used on the 30D RR level tile.',
+    stressDirection: -1,
+    flowDisplay: 'diverging',
   },
 };
 
