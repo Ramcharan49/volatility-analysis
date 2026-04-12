@@ -11,6 +11,9 @@ export interface DashboardCurrent {
   scenario_implications_json: string[] | null;
   data_quality_json: DataQuality | null;
   updated_at: string | null;
+  regime_narrative: string | null;
+  narrative_generated_at: string | null;
+  narrative_model: string | null;
 }
 
 export interface KeyCard {
@@ -79,3 +82,28 @@ export type TenorCode = '7d' | '30d' | '90d';
 export type WindowCode = '5m' | '15m' | '60m' | '1d';
 export type TimeRange = '1D' | '5D' | '1M' | '3M';
 export type DeltaBucket = 'P25' | 'ATM' | 'C25';
+
+export type MetricFormat = 'pct' | 'bps' | 'score' | 'raw';
+export type MetricFamily = 'volatility' | 'skew' | 'tail' | 'fed' | 'term' | 'regime';
+
+export interface MetricMeta {
+  key: string;
+  displayName: string;
+  shortName: string;
+  tenor: TenorCode | null;
+  family: MetricFamily;
+  color: string;
+  format: MetricFormat;
+  relatedKeys: string[];
+  spreadKey: string | null;
+  explainer: string;
+  /**
+   * Orientation of the percentile relative to the product's stress convention.
+   *   +1 (default) — higher raw percentile = more stress (e.g., IV level).
+   *   -1           — lower raw percentile = more stress (e.g., RR level).
+   *                  Display is inverted to `100 - raw` so the UI reads uniformly:
+   *                  "higher percentile = more stress" across the whole dashboard.
+   * Mirrors worker/percentile.py _STRESS_DIRECTION_ALIGNS.
+   */
+  stressDirection?: 1 | -1;
+}

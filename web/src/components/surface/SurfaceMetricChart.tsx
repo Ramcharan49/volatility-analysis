@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import ChartContainer from '@/components/shared/ChartContainer';
-import { getPercentileColor } from '@/lib/constants';
+import { getPercentileColor, getDisplayPercentile } from '@/lib/constants';
+import { ordinalSuffix } from '@/lib/formatting';
 import type { MetricRow } from '@/types';
 import type { EChartsCoreOption } from 'echarts/core';
 
@@ -94,7 +95,13 @@ function buildOption(
         const [ts, val] = params[0].value;
         const d = new Date(ts);
         const dateStr = `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`;
-        const valStr = isPctl ? `${Math.round(val)}th %ile` : `${(val * 100).toFixed(2)}%`;
+        let valStr: string;
+        if (isPctl) {
+          const n = Math.round(val);
+          valStr = `${n}${ordinalSuffix(n)} %ile`;
+        } else {
+          valStr = `${(val * 100).toFixed(2)}%`;
+        }
         return `<strong>${dateStr}</strong><br/>${valStr}`;
       },
     },
@@ -177,13 +184,17 @@ export default function SurfaceMetricChart({
     if (!key) return [];
 
     const rows = seriesMap.get(key) ?? [];
-    return rows.map((row) => ({
-      time: parseTs(row.ts),
-      value:
-        displayMode === 'pctl'
-          ? (row.percentile != null ? Number(row.percentile) : 0)
-          : (row.value != null ? Number(row.value) : 0),
-    }));
+    return rows.map((row) => {
+      const rawPct = row.percentile != null ? Number(row.percentile) : null;
+      const displayPct = getDisplayPercentile(key, rawPct);
+      return {
+        time: parseTs(row.ts),
+        value:
+          displayMode === 'pctl'
+            ? (displayPct ?? 0)
+            : (row.value != null ? Number(row.value) : 0),
+      };
+    });
   }, [isSpreadMode, spreadSeriesMap, spreadOptions, selectedIdx, displayMode, options, seriesMap]);
 
   // Get latest value
@@ -204,7 +215,13 @@ export default function SurfaceMetricChart({
     };
   }, [isSpreadMode, spreadLatestMap, spreadOptions, selectedIdx, options, latestMap]);
 
-  const pctlColor = getPercentileColor(latestValue.percentile);
+  const currentKey = isSpreadMode ? null : options[selectedIdx]?.key ?? null;
+  const effectivePctl = currentKey != null
+    ? getDisplayPercentile(currentKey, latestValue.percentile)
+    : latestValue.percentile;
+  const pctlColor = getPercentileColor(effectivePctl);
+  const pctlInt = effectivePctl != null ? Math.round(effectivePctl) : null;
+  const pctlText = pctlInt != null ? `${pctlInt}${ordinalSuffix(pctlInt)}` : '--';
   const isPctl = displayMode === 'pctl';
   // For computed spreads, disable PCTL toggle
   const canShowPctl = !isSpreadMode;
@@ -253,16 +270,16 @@ export default function SurfaceMetricChart({
               style={{ color: isPctl ? '#b9b9b9' : pctlColor }}
             >
               {isPctl
-                ? `${Math.round(latestValue.percentile ?? 0)}th`
+                ? pctlText
                 : `${(latestValue.value * 100).toFixed(2)}%`}
             </span>
           )}
-          {latestValue.percentile != null && !isPctl && (
+          {effectivePctl != null && !isPctl && (
             <span
               className="mono-value text-xs px-1.5 py-0.5 rounded"
               style={{ color: pctlColor, background: `${pctlColor}15` }}
             >
-              {Math.round(latestValue.percentile)}th
+              {pctlText}
             </span>
           )}
         </div>

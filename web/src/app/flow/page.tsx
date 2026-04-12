@@ -3,11 +3,12 @@
 import { useState, useCallback } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getMetricSeries, getLatestMetrics } from '@/lib/queries';
-import { FLOW_KEYS } from '@/lib/constants';
+import { FLOW_BASES } from '@/lib/constants';
 import FlowChartSection from '@/components/flow/FlowChartSection';
 import WindowSelector from '@/components/shared/WindowSelector';
 import TimeRangeSelector from '@/components/shared/TimeRangeSelector';
 import LoadingSkeleton, { SkeletonChart } from '@/components/shared/LoadingSkeleton';
+import CrosshairProvider from '@/components/shared/CrosshairProvider';
 import type { MetricRow, TimeRange, WindowCode, TenorCode } from '@/types';
 
 interface FlowData {
@@ -40,11 +41,11 @@ export default function FlowPage() {
   // d_front_end_dominance_{window}
   const w = windowCode;
   const allKeys = [
-    `${FLOW_KEYS.D_ATM_IV_7D}_${w}`,
-    `${FLOW_KEYS.D_ATM_IV_30D}_${w}`,
-    `${FLOW_KEYS.D_RR25_30D}_${w}`,
-    `${FLOW_KEYS.D_BF25_30D}_${w}`,
-    `${FLOW_KEYS.D_FRONT_END_DOMINANCE}_${w}`,
+    `${FLOW_BASES.D_ATM_IV_7D}_${w}`,
+    `${FLOW_BASES.D_ATM_IV_30D}_${w}`,
+    `${FLOW_BASES.D_RR25_30D}_${w}`,
+    `${FLOW_BASES.D_BF25_30D}_${w}`,
+    `${FLOW_BASES.D_FRONT_END_DOMINANCE}_${w}`,
   ];
 
   const fetchFlow = useCallback(async (): Promise<FlowData | null> => {
@@ -72,17 +73,18 @@ export default function FlowPage() {
   const latest = data?.latest ?? [];
 
   // Key helpers
-  const atmIv7d = `${FLOW_KEYS.D_ATM_IV_7D}_${w}`;
-  const atmIv30d = `${FLOW_KEYS.D_ATM_IV_30D}_${w}`;
-  const rr25_30d = `${FLOW_KEYS.D_RR25_30D}_${w}`;
-  const bf25_30d = `${FLOW_KEYS.D_BF25_30D}_${w}`;
-  const fed = `${FLOW_KEYS.D_FRONT_END_DOMINANCE}_${w}`;
+  const atmIv7d = `${FLOW_BASES.D_ATM_IV_7D}_${w}`;
+  const atmIv30d = `${FLOW_BASES.D_ATM_IV_30D}_${w}`;
+  const rr25_30d = `${FLOW_BASES.D_RR25_30D}_${w}`;
+  const bf25_30d = `${FLOW_BASES.D_BF25_30D}_${w}`;
+  const fed = `${FLOW_BASES.D_FRONT_END_DOMINANCE}_${w}`;
 
   return (
+    <CrosshairProvider>
     <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
       {/* Global controls */}
       <div
-        className="flex items-center gap-4 px-4 py-3 rounded-lg sticky top-[52px] z-30"
+        className="flex items-center gap-4 px-4 py-3 rounded-lg sticky top-0 z-30"
         style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
       >
         <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Window</span>
@@ -145,5 +147,6 @@ export default function FlowPage() {
         staggerClass="stagger-4"
       />
     </div>
+    </CrosshairProvider>
   );
 }

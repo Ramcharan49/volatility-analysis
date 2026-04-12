@@ -8,6 +8,7 @@ import IVHeatmap from '@/components/surface/IVHeatmap';
 import SurfaceMetricChart from '@/components/surface/SurfaceMetricChart';
 import SectionHeader from '@/components/shared/SectionHeader';
 import LoadingSkeleton, { SkeletonChart } from '@/components/shared/LoadingSkeleton';
+import CrosshairProvider from '@/components/shared/CrosshairProvider';
 import type { SurfaceCell, MetricRow, TimeRange } from '@/types';
 
 type SurfaceRange = '1W' | '1M' | '3M';
@@ -161,18 +162,19 @@ export default function SurfacePage() {
   }
 
   return (
+    <CrosshairProvider>
     <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
       {/* Global controls bar */}
       <div
-        className="flex items-center gap-4 px-4 py-3 rounded-lg sticky top-[52px] z-30"
+        className="flex items-center gap-4 px-4 py-3 rounded-lg sticky top-0 z-30"
         style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
       >
         <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Range</span>
-        <div className="toggle-group">
+        <div className="pill-group">
           {(['1W', '1M', '3M'] as SurfaceRange[]).map((r) => (
             <button
               key={r}
-              className={`toggle-btn ${range === r ? 'active' : ''}`}
+              className={`pill-btn ${range === r ? 'active' : ''}`}
               onClick={() => setRange(r)}
             >
               {r}
@@ -294,5 +296,6 @@ export default function SurfacePage() {
         />
       </div>
     </div>
+    </CrosshairProvider>
   );
 }

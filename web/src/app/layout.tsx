@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import TabBar from '@/components/layout/TabBar';
+import TopNav from '@/components/layout/TopNav';
 
 export const metadata: Metadata = {
   title: 'NIFTY Volatility Intelligence',
@@ -14,9 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">
-        <TabBar />
-        <main className="flex-1 overflow-y-auto">
+      <body className="h-full flex flex-col overflow-hidden">
+        <TopNav />
+        <main className="flex-1 min-h-0 overflow-y-auto">
           {children}
         </main>
       </body>

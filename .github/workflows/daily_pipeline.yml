@@ -49,3 +49,24 @@ jobs:
           fi
           echo "::notice::Running daily pipeline for $TARGET_DATE"
           python backfill.py --from "$TARGET_DATE" --to "$TARGET_DATE" --mode daily --daily-source nse_udiff
+
+      - name: Generate regime narrative
+        if: ${{ success() }}
+        continue-on-error: true
+        env:
+          SUPABASE_DB_URL_SESSION: ${{ secrets.SUPABASE_DB_URL_SESSION }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PHASE0_PROVIDER: nse_udiff
+          NARRATIVE_ENABLED: ${{ vars.NARRATIVE_ENABLED || 'false' }}
+          NARRATIVE_PROVIDER: ${{ vars.NARRATIVE_PROVIDER || 'google-gla' }}
+          NARRATIVE_MODEL: ${{ vars.NARRATIVE_MODEL || 'gemma-4-31b-it' }}
+        run: |
+          TARGET_DATE="${{ github.event.inputs.date }}"
+          if [ -z "$TARGET_DATE" ]; then
+            TARGET_DATE=$(TZ=Asia/Kolkata date +%Y-%m-%d)
+          fi
+          echo "::notice::Generating regime narrative for $TARGET_DATE (provider=$NARRATIVE_PROVIDER model=$NARRATIVE_MODEL)"
+          python -m worker.narrative_job --date "$TARGET_DATE"

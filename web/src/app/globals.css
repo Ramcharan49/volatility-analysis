@@ -46,10 +46,47 @@
   --font-label: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --radius-sm: 6px;
-  --radius-md: 6px;
-  --radius-lg: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-pill: 99999px;
+
+  --bg-card-dense: #0e0e0e;
+  --border-card: #1a1a1a;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+
+  --transition-fast: 150ms;
+  --transition-normal: 300ms;
+  --spring-easing: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --font-size-hero: 32px;
+  --font-size-value: 18px;
+  --font-size-label: 9px;
+
+  /* ── Premium Design — Void, Glass, Neon ─────────────── */
+  --void-canvas: #0a0a0d;
+  --void-canvas-deep: #050507;
+
+  --glass-bg: rgba(255, 255, 255, 0.025);
+  --glass-bg-hover: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-border-hover: rgba(255, 255, 255, 0.12);
+  --glass-edge-light: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 35%);
+  --glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.55), 0 2px 0 0 rgba(255, 255, 255, 0.05) inset, 0 0 0 1px rgba(255, 255, 255, 0.015) inset;
+  --glass-shadow-hover: 0 22px 60px 0 rgba(0, 0, 0, 0.65), 0 2px 0 0 rgba(255, 255, 255, 0.09) inset, 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+
+  --text-hero: #f5f5f7;
+  --text-ghost: #6a6a72;
+
+  --neon-cyan: #4ad8ff;
+  --neon-amber: #ffb84d;
+  --neon-red: #ff5566;
+  --neon-green: #4dffaa;
+  --neon-purple: #b48dff;
 }
 
 @theme inline {
@@ -62,7 +99,10 @@
 /* ── Base ──────────────────────────────────────────────── */
 
 body {
-  background: var(--bg-primary);
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(74, 216, 255, 0.025), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 100%, rgba(180, 141, 255, 0.02), transparent 60%),
+    var(--void-canvas);
   color: var(--text-primary);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -213,4 +253,237 @@ body {
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
   50% { opacity: 0.6; box-shadow: 0 0 8px currentColor; }
+}
+
+/* ── Dense card ───────────────────────────────────────── */
+
+.card-dense {
+  background: var(--bg-card-dense);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast) ease;
+}
+
+.card-dense:hover {
+  border-color: var(--border-accent);
+}
+
+/* ── Page transitions ─────────────────────────────────── */
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.page-enter {
+  animation: slideInRight 300ms var(--spring-easing) both;
+}
+
+.page-fade {
+  animation: fadeIn 200ms ease-out both;
+}
+
+/* ── Pill group ───────────────────────────────────────── */
+
+.pill-group {
+  display: inline-flex;
+  gap: var(--space-xs);
+  justify-content: center;
+}
+
+.pill-btn {
+  font-family: var(--font-label);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+}
+
+.pill-btn:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-accent);
+}
+
+.pill-btn.active {
+  color: var(--text-primary);
+  background: var(--accent-cyan-dim);
+  border-color: var(--accent-cyan);
+}
+
+/* ── Top navigation ───────────────────────────────────── */
+
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) 24px;
+  background: rgba(10, 10, 13, 0.75);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* ── Frosted Glass Tile ───────────────────────────────── */
+
+.glass-tile {
+  position: relative;
+  color: var(--text-primary);
+  background:
+    var(--glass-edge-light),
+    var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+  transition:
+    box-shadow 280ms var(--spring-easing),
+    border-color 280ms var(--spring-easing),
+    background 280ms var(--spring-easing),
+    transform 280ms var(--spring-easing);
+  will-change: transform, box-shadow;
+}
+
+.glass-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-tile:hover {
+  background:
+    var(--glass-edge-light),
+    var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.glass-tile:focus-visible {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow:
+    var(--glass-shadow-hover),
+    0 0 0 1px var(--neon-cyan) inset,
+    0 0 20px rgba(74, 216, 255, 0.25);
+}
+
+/* Reverse cross-pollination: when the regime dot is hovered, all tiles glow subtly */
+.glass-tile[data-regime-hovered="true"] {
+  border-color: var(--glass-border-hover);
+  background:
+    var(--glass-edge-light),
+    var(--glass-bg-hover);
+}
+
+.glass-tile-static {
+  position: relative;
+  color: var(--text-primary);
+  background:
+    var(--glass-edge-light),
+    var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+}
+
+.glass-tile-static::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Neon Glow Utility ────────────────────────────────── */
+
+.neon-glow {
+  filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 2px currentColor);
+}
+
+/* ── Hero Typography ──────────────────────────────────── */
+
+.text-hero {
+  color: var(--text-hero);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "ss01";
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+}
+
+.text-ghost {
+  color: var(--text-ghost);
+  font-family: var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ── Regime breath pulse ─────────────────────────────── */
+
+@keyframes regime-breath {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.35;
+    box-shadow: 0 0 14px var(--breath-glow, rgba(255, 255, 255, 0.4));
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.22);
+    opacity: 0.75;
+    box-shadow: 0 0 32px var(--breath-glow, rgba(255, 255, 255, 0.6));
+  }
+}
+
+.regime-breath-pulse {
+  border: 1px solid;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  animation: regime-breath 2.5s ease-in-out infinite;
+  will-change: transform, opacity, box-shadow;
 }
