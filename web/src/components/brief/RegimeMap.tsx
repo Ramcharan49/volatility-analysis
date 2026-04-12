@@ -42,7 +42,7 @@ function formatDate(dateStr: string): string {
 
 export default function RegimeMap({ stateScore, stressScore, quadrant, trail: initialTrail }: Props) {
   const [range] = useState<TrailRange>('1M');
-  const { hovered, setRegimeHovered } = useHover();
+  const { hovered } = useHover();
 
   const fetchExtended = useCallback(async () => {
     if (range === '7D') return null;
@@ -95,7 +95,7 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
       })
     : [];
 
-  const option: EChartsCoreOption = {
+  const option = useMemo<EChartsCoreOption>(() => ({
     animation: true,
     animationDuration: 800,
     animationEasing: 'cubicOut',
@@ -248,10 +248,32 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
               z: 8,
               silent: true,
             },
+            // Transparent hit-area on top — catches hover across the full halo so
+            // the tooltip fires anywhere inside the pulse ring, not only on the
+            // 14px core dot.
+            {
+              type: 'scatter' as const,
+              data: [recentPoints[recentPoints.length - 1]],
+              symbol: 'circle',
+              symbolSize: 44,
+              itemStyle: {
+                color: 'rgba(0,0,0,0)',
+                borderWidth: 0,
+              },
+              cursor: 'pointer',
+              z: 11,
+              tooltip: {
+                formatter: () => {
+                  const pt = recentPoints[recentPoints.length - 1] as number[];
+                  const date = recentDates[recentDates.length - 1];
+                  return `<strong>${date}</strong><br/>State ${pt[0]?.toFixed(1)} · Stress ${pt[1]?.toFixed(1)}`;
+                },
+              },
+            },
           ]
         : []),
     ],
-  };
+  }), [trail, stateScore, stressScore, quadrant, accentColor, accentGlow, recentPoints, recentDates]);
 
   // Compute pixel position of current regime dot within the chart plot area
   // so we can overlay a breath-pulse ring on it (purely CSS, no ECharts redraw).
@@ -302,59 +324,31 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
         </span>
       </div>
 
-      {/* Radar coordinate labels — anchored to axis extremities */}
+      {/* Radar coordinate labels — muted context, no arrows */}
       <div className="absolute inset-0 pointer-events-none z-10">
-        {/* Top: RISING (along upper edge of chart grid) */}
         <span
-          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
-          style={{
-            top: 14,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            color: 'var(--text-ghost)',
-            fontFamily: 'var(--font-label)',
-          }}
+          className="absolute text-[9px] tracking-[0.28em] uppercase font-bold"
+          style={{ top: 16, left: '50%', transform: 'translateX(-50%)', color: '#6a6a72', fontFamily: 'var(--font-label)' }}
         >
-          ↑ Rising
+          Building
         </span>
-        {/* Bottom: DECLINING */}
         <span
-          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
-          style={{
-            bottom: 14,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            color: 'var(--text-ghost)',
-            fontFamily: 'var(--font-label)',
-          }}
+          className="absolute text-[9px] tracking-[0.28em] uppercase font-bold"
+          style={{ bottom: 16, left: '50%', transform: 'translateX(-50%)', color: '#6a6a72', fontFamily: 'var(--font-label)' }}
         >
-          ↓ Declining
+          Easing
         </span>
-        {/* Left: LOW VOL — vertically centered, written horizontally */}
         <span
-          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
-          style={{
-            top: '50%',
-            left: 10,
-            transform: 'translateY(-50%)',
-            color: 'var(--text-ghost)',
-            fontFamily: 'var(--font-label)',
-          }}
+          className="absolute text-[9px] tracking-[0.28em] uppercase font-bold"
+          style={{ top: '50%', left: 12, transform: 'translateY(-50%)', color: '#6a6a72', fontFamily: 'var(--font-label)' }}
         >
-          ← Low
+          Relaxed
         </span>
-        {/* Right: HIGH VOL */}
         <span
-          className="absolute text-[8px] tracking-[0.22em] uppercase font-semibold"
-          style={{
-            top: '50%',
-            right: 12,
-            transform: 'translateY(-50%)',
-            color: 'var(--text-ghost)',
-            fontFamily: 'var(--font-label)',
-          }}
+          className="absolute text-[9px] tracking-[0.28em] uppercase font-bold"
+          style={{ top: '50%', right: 14, transform: 'translateY(-50%)', color: '#6a6a72', fontFamily: 'var(--font-label)' }}
         >
-          High →
+          Elevated
         </span>
       </div>
 
@@ -382,24 +376,6 @@ export default function RegimeMap({ stateScore, stressScore, quadrant, trail: in
               borderColor: accentColor,
               ['--breath-glow' as string]: accentGlow,
             }}
-            aria-hidden="true"
-          />
-        )}
-
-        {/* Hit target over the current regime dot — drives reverse link */}
-        {breathDot && (
-          <div
-            className="absolute cursor-default"
-            style={{
-              left: breathDot.left,
-              top: breathDot.top,
-              width: 56,
-              height: 56,
-              transform: 'translate(-50%, -50%)',
-              borderRadius: '50%',
-            }}
-            onMouseEnter={() => setRegimeHovered(true)}
-            onMouseLeave={() => setRegimeHovered(false)}
             aria-hidden="true"
           />
         )}

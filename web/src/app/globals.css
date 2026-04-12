@@ -357,6 +357,7 @@ body {
 
 .glass-tile {
   position: relative;
+  color: var(--text-primary);
   background:
     var(--glass-edge-light),
     var(--glass-bg);
@@ -413,17 +414,9 @@ body {
     var(--glass-bg-hover);
 }
 
-.glass-tile[data-expanded="true"] {
-  border-color: var(--glass-border-hover);
-  background: var(--glass-bg-hover);
-  box-shadow: var(--glass-shadow-hover);
-}
-.glass-tile[data-expanded="true"]:hover {
-  transform: none;
-}
-
 .glass-tile-static {
   position: relative;
+  color: var(--text-primary);
   background:
     var(--glass-edge-light),
     var(--glass-bg);

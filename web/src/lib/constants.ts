@@ -19,13 +19,22 @@ export const METRIC_KEYS = {
   STRESS_SCORE: 'stress_score',
 } as const;
 
-// Flow change metric key patterns (only keys that exist in DB)
-export const FLOW_KEYS = {
+// Flow metric base keys (append window code like _1d / _5m to form full metric_key).
+export const FLOW_BASES = {
   D_ATM_IV_7D: 'd_atm_iv_7d',
   D_ATM_IV_30D: 'd_atm_iv_30d',
   D_RR25_30D: 'd_rr25_30d',
   D_BF25_30D: 'd_bf25_30d',
   D_FRONT_END_DOMINANCE: 'd_front_end_dominance',
+} as const;
+
+// Full 1-day flow metric keys as stored in metric_series_1m (window_code='1d').
+export const FLOW_KEYS = {
+  D_ATM_IV_7D_1D: 'd_atm_iv_7d_1d',
+  D_ATM_IV_30D_1D: 'd_atm_iv_30d_1d',
+  D_RR25_30D_1D: 'd_rr25_30d_1d',
+  D_BF25_30D_1D: 'd_bf25_30d_1d',
+  D_FRONT_END_DOMINANCE_1D: 'd_front_end_dominance_1d',
 } as const;
 
 // Percentile color scale — deep blue (low) → neutral → amber → red (extreme)
@@ -158,7 +167,10 @@ export const METRIC_REGISTRY: Record<string, MetricMeta> = {
     format: 'raw',
     relatedKeys: ['rr25_30d', 'rr25_90d'],
     spreadKey: null,
-    explainer: '25-delta risk reversal at 7 days — measures put-call skew and directional fear.',
+    explainer:
+      '25-delta risk reversal at 7 days — measures put-call skew and directional fear. ' +
+      'Displayed with inverted percentile so "higher" uniformly reads as "more downside skew / more stress."',
+    stressDirection: -1,
   },
   rr25_30d: {
     key: 'rr25_30d',
@@ -170,7 +182,11 @@ export const METRIC_REGISTRY: Record<string, MetricMeta> = {
     format: 'raw',
     relatedKeys: ['rr25_7d', 'rr25_90d'],
     spreadKey: null,
-    explainer: '25-delta risk reversal at 30 days — the standard skew measure for directional sentiment.',
+    explainer:
+      '25-delta risk reversal at 30 days — the standard skew measure for ' +
+      'directional sentiment. Displayed with inverted percentile so "higher" ' +
+      'uniformly reads as "more downside skew / more stress."',
+    stressDirection: -1,
   },
   rr25_90d: {
     key: 'rr25_90d',
@@ -182,7 +198,10 @@ export const METRIC_REGISTRY: Record<string, MetricMeta> = {
     format: 'raw',
     relatedKeys: ['rr25_7d', 'rr25_30d'],
     spreadKey: null,
-    explainer: '25-delta risk reversal at 90 days — longer-term skew reflecting structural hedging demand.',
+    explainer:
+      '25-delta risk reversal at 90 days — longer-term skew reflecting structural hedging demand. ' +
+      'Displayed with inverted percentile so "higher" uniformly reads as "more downside skew / more stress."',
+    stressDirection: -1,
   },
   bf25_7d: {
     key: 'bf25_7d',
@@ -268,6 +287,30 @@ export const METRIC_REGISTRY: Record<string, MetricMeta> = {
     spreadKey: null,
     explainer: 'Composite measure of how much short-dated vol dominates the term structure.',
   },
+  d_atm_iv_30d_1d: {
+    key: 'd_atm_iv_30d_1d',
+    displayName: 'Chg in 30D ATM IV',
+    shortName: 'Δ 30D IV',
+    tenor: '30d',
+    family: 'volatility',
+    color: '#0052ef',
+    format: 'pct',
+    relatedKeys: [],
+    spreadKey: null,
+    explainer: 'One-day change in 30D ATM implied volatility.',
+  },
+  d_rr25_30d_1d: {
+    key: 'd_rr25_30d_1d',
+    displayName: 'Chg in 30D 25Δ RR',
+    shortName: 'Δ 30D RR',
+    tenor: '30d',
+    family: 'skew',
+    color: '#a78bfa',
+    format: 'raw',
+    relatedKeys: [],
+    spreadKey: null,
+    explainer: 'One-day change in 30D 25-delta risk reversal.',
+  },
 };
 
 /** Look up metric metadata; returns a sensible fallback for unknown keys. */
@@ -285,6 +328,24 @@ export function getMetricMeta(key: string): MetricMeta {
     spreadKey: null,
     explainer: '',
   };
+}
+
+/**
+ * Translate a raw statistical percentile into the product's stress-oriented
+ * display percentile for a given metric. Always prefer this over showing raw
+ * percentile directly in the UI, so the stress convention stays uniform
+ * ("higher = more stress") across every tile, callout, and badge.
+ */
+export function getDisplayPercentile(
+  metricKey: string,
+  rawPercentile: number | null | undefined,
+): number | null {
+  if (rawPercentile == null) return null;
+  const meta = getMetricMeta(metricKey);
+  if (meta.stressDirection === -1) {
+    return 100 - rawPercentile;
+  }
+  return rawPercentile;
 }
 
 export const FAMILY_COLORS: Record<MetricFamily, string> = {

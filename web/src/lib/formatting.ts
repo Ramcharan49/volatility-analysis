@@ -66,5 +66,28 @@ export function getRegimeColor(quadrant: string | null | undefined): string {
   return config?.color ?? '#595959';
 }
 
+/**
+ * Format an ISO timestamp as a short month+day stamp ("Apr 12") for the
+ * AI-narrative freshness line on the home page.
+ */
+export function formatStampDate(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+}
+
+/** Ordinal suffix for English numbers: 1→st, 2→nd, 3→rd, 4→th, 11→th, 21→st, etc. */
+export function ordinalSuffix(n: number): string {
+  const abs = Math.abs(n) % 100;
+  if (abs >= 11 && abs <= 13) return 'th';
+  switch (abs % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
 // Re-export percentile helpers from constants for centralized access
 export { getPercentileColor, getPercentileLabel };

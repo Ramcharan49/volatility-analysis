@@ -1,83 +1,78 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useCallback, useMemo } from 'react';
 import { usePolling } from '@/hooks/usePolling';
-import { getDashboardCurrent, getRegimeTrail, getMetricSeries } from '@/lib/queries';
-import { getMetricMeta } from '@/lib/constants';
+import { getDashboardCurrent, getRegimeTrail, getLatestFlowSnapshot } from '@/lib/queries';
 import RegimeMap from '@/components/brief/RegimeMap';
-import BentoGrid from '@/components/brief/BentoGrid';
-import MetricTile from '@/components/brief/MetricTile';
-import SummaryDrawer from '@/components/brief/SummaryDrawer';
-import AnalysisSummary from '@/components/brief/AnalysisSummary';
+import MetricGroup from '@/components/brief/MetricGroup';
+import RegimeAnalysis from '@/components/brief/RegimeAnalysis';
 import { HoverProvider } from '@/components/brief/HoverContext';
-import type { DashboardCurrent, RegimeTrailPoint, MetricRow } from '@/types';
+import type { DashboardCurrent, RegimeTrailPoint } from '@/types';
 
 interface HomeData {
   dashboard: DashboardCurrent | null;
   trail: RegimeTrailPoint[];
-  series: MetricRow[];
+  flows: Record<string, { value: number | null; percentile: number | null }>;
 }
 
-// Hero metrics for the four bento tiles
-const HERO_KEYS = ['atm_iv_30d', 'term_7d_30d', 'rr25_30d', 'bf25_30d'] as const;
-const SECONDARY_KEYS = ['atm_iv_7d'] as const;
-const ALL_KEYS = [...HERO_KEYS, ...SECONDARY_KEYS] as const;
+const FLOW_KEYS_FOR_HOME = ['d_atm_iv_30d_1d', 'd_rr25_30d_1d'];
+
+function LevelIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 8 L5 5 L7 7 L10 3" />
+      <path d="M7 3 L10 3 L10 6" />
+    </svg>
+  );
+}
+
+function ShapeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+      <path d="M6 1.5 L10.5 6 L6 10.5 L1.5 6 Z" />
+      <path d="M6 3.5 L8.5 6 L6 8.5 L3.5 6 Z" />
+    </svg>
+  );
+}
+
+function MomentumIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 6 L3 6 L4.5 3 L6 9 L7.5 5 L9 7 L11 6" />
+    </svg>
+  );
+}
 
 export default function HomePage() {
   const fetchHome = useCallback(async (): Promise<HomeData | null> => {
-    const [dashboard, trail, series] = await Promise.all([
+    const [dashboard, trail, flows] = await Promise.all([
       getDashboardCurrent(),
       getRegimeTrail(7),
-      getMetricSeries([...ALL_KEYS], '1M'),
+      getLatestFlowSnapshot(FLOW_KEYS_FOR_HOME),
     ]);
-    return { dashboard, trail, series };
+    return { dashboard, trail, flows };
   }, []);
 
   const { data, loading } = usePolling<HomeData>(fetchHome);
-  const [summaryOpen, setSummaryOpen] = useState(false);
 
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
-
-  const toggleExpanded = useCallback((key: string) => {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }, []);
-
-  const { seriesByKey, cardByKey, timeSeriesByKey } = useMemo(() => {
-    const byKey = new Map<string, number[]>();
-    const tsByKey = new Map<string, { ts: string; value: number }[]>();
-    for (const row of data?.series ?? []) {
-      if (row.value == null) continue;
-      const val = Number(row.value);
-      const arr = byKey.get(row.metric_key) ?? [];
-      arr.push(val);
-      byKey.set(row.metric_key, arr);
-      const tsArr = tsByKey.get(row.metric_key) ?? [];
-      tsArr.push({ ts: row.ts, value: val });
-      tsByKey.set(row.metric_key, tsArr);
-    }
-    const cards = new Map<string, { value: number | null; percentile: number | null }>();
+  const cardByKey = useMemo(() => {
+    const map = new Map<string, { value: number | null; percentile: number | null }>();
     for (const card of data?.dashboard?.key_cards_json ?? []) {
-      cards.set(card.metric_key, {
+      map.set(card.metric_key, {
         value: card.raw_value != null ? Number(card.raw_value) : null,
         percentile: card.percentile != null ? Number(card.percentile) : null,
       });
     }
-    return { seriesByKey: byKey, cardByKey: cards, timeSeriesByKey: tsByKey };
+    return map;
   }, [data]);
 
   if (loading && !data) {
     return (
       <div className="h-full w-full flex items-center justify-center">
-        <span className="text-xs tracking-widest uppercase" style={{ color: 'var(--text-ghost)', fontFamily: 'var(--font-label)' }}>
+        <span
+          className="text-xs tracking-widest uppercase"
+          style={{ color: 'var(--text-ghost)', fontFamily: 'var(--font-label)' }}
+        >
           Loading signal…
         </span>
       </div>
@@ -85,103 +80,55 @@ export default function HomePage() {
   }
 
   const db = data?.dashboard;
+  const flows = data?.flows ?? {};
 
-  const tileFor = (key: string, label: string, secondary?: { key: string; label: string }) => {
-    const meta = getMetricMeta(key);
-    const card = cardByKey.get(key);
-    const secondaryCard = secondary ? cardByKey.get(secondary.key) : undefined;
-    return (
-      <MetricTile
-        key={key}
-        metricKey={key}
-        label={label}
-        value={card?.value ?? null}
-        format={meta.format}
-        percentile={card?.percentile ?? null}
-        series={seriesByKey.get(key) ?? []}
-        expanded={expandedKeys.has(key)}
-        onToggle={() => toggleExpanded(key)}
-        timeSeries={timeSeriesByKey.get(key) ?? []}
-        secondary={
-          secondary && secondaryCard
-            ? { label: secondary.label, percentile: secondaryCard.percentile }
-            : undefined
-        }
-      />
-    );
-  };
+  const pct = (key: string) => cardByKey.get(key)?.percentile ?? null;
+  const flowPct = (key: string) => flows[key]?.percentile ?? null;
+
+  const levelRows = [
+    { metricKey: 'atm_iv_7d', label: '7D ATM IV', percentile: pct('atm_iv_7d') },
+    { metricKey: 'atm_iv_30d', label: '30D ATM IV', percentile: pct('atm_iv_30d') },
+  ];
+  const shapeRows = [
+    { metricKey: 'term_7d_30d', label: '7D − 30D IV', percentile: pct('term_7d_30d') },
+    { metricKey: 'rr25_30d', label: '30D 25Δ RR', percentile: pct('rr25_30d') },
+  ];
+  const momentumRows = [
+    { metricKey: 'd_atm_iv_30d_1d', label: 'Chg 30D IV', percentile: flowPct('d_atm_iv_30d_1d') },
+    { metricKey: 'd_rr25_30d_1d', label: 'Chg 30D RR', percentile: flowPct('d_rr25_30d_1d') },
+  ];
 
   return (
     <HoverProvider>
-    <div className="h-full w-full px-6 py-5 grid gap-5 min-h-0" style={{ gridTemplateColumns: '65fr 35fr' }}>
-      {/* Left: Regime Map (65%) */}
-      <div className="min-h-0 min-w-0">
-        <RegimeMap
-          stateScore={db?.state_score ?? null}
-          stressScore={db?.stress_score ?? null}
-          quadrant={db?.quadrant ?? null}
-          trail={data?.trail ?? []}
-        />
-      </div>
-
-      {/* Right: Bento grid (35%) */}
-      <div className="min-h-0 min-w-0 flex flex-col gap-3">
-        <div className="flex-1 min-h-0">
-          <BentoGrid>
-            {tileFor('atm_iv_30d', 'Vol', { key: 'atm_iv_7d', label: '7D' })}
-            {tileFor('term_7d_30d', 'Spread')}
-            {tileFor('rr25_30d', 'Skew')}
-            {tileFor('bf25_30d', 'Convexity')}
-          </BentoGrid>
+      <div
+        className="h-full w-full px-6 py-5 grid gap-5 min-h-0"
+        style={{ gridTemplateColumns: '65fr 35fr', gridTemplateRows: 'minmax(0, 1fr) auto' }}
+      >
+        <div className="min-h-0 min-w-0">
+          <RegimeMap
+            stateScore={db?.state_score ?? null}
+            stressScore={db?.stress_score ?? null}
+            quadrant={db?.quadrant ?? null}
+            trail={data?.trail ?? []}
+          />
         </div>
 
-        {/* Insights trigger — glass icon button with spring-lift, bottom-right */}
-        <motion.button
-          type="button"
-          onClick={() => setSummaryOpen(true)}
-          whileHover={{
-            y: -3,
-            scale: 1.012,
-            transition: { type: 'spring', stiffness: 380, damping: 26 },
-          }}
-          className="glass-tile-static self-end flex items-center justify-center"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 9999,
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-          }}
-          aria-label="Open insights summary"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          >
-            <path d="M3 10V13" />
-            <path d="M8 5V13" />
-            <path d="M13 8V13" />
-          </svg>
-        </motion.button>
-      </div>
+        <div className="min-h-0 min-w-0 flex flex-col gap-3">
+          <MetricGroup title="Volatility Level" icon={<LevelIcon />} rows={levelRows} />
+          <MetricGroup title="Surface Shape" icon={<ShapeIcon />} rows={shapeRows} />
+          <MetricGroup title="Surface Momentum" icon={<MomentumIcon />} rows={momentumRows} />
+        </div>
 
-      <SummaryDrawer
-        open={summaryOpen}
-        onClose={() => setSummaryOpen(false)}
-        quadrant={db?.quadrant ?? null}
-      >
-        <AnalysisSummary
-          quadrant={db?.quadrant ?? null}
-          insights={db?.insight_bullets_json ?? null}
-          scenarios={db?.scenario_implications_json ?? null}
-        />
-      </SummaryDrawer>
-    </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <RegimeAnalysis
+            insights={db?.insight_bullets_json ?? null}
+            scenarios={db?.scenario_implications_json ?? null}
+            quadrant={db?.quadrant ?? null}
+            narrative={db?.regime_narrative ?? null}
+            narrativeGeneratedAt={db?.narrative_generated_at ?? null}
+          />
+        </div>
+      </div>
     </HoverProvider>
   );
 }

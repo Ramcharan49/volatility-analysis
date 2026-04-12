@@ -39,6 +39,16 @@ class Settings:
     ws_token_limit: int = 1800
     strike_step: Optional[float] = None
     strikes_around_atm: int = 15
+    # Narrative generation (LLM-based daily paragraph)
+    gemini_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
+    narrative_enabled: bool = True
+    narrative_provider: str = "google-gla"
+    narrative_model: str = "gemma-4-31b-it"
+    narrative_max_tokens: int = 220
+    narrative_timeout_s: int = 30
 
     @property
     def spot_exchange(self) -> str:
@@ -78,6 +88,15 @@ def load_settings() -> Settings:
         daily_history_source=_clean_env("PHASE0_DAILY_HISTORY_SOURCE") or "nse_udiff",
         strike_step=float(_clean_env("PHASE0_STRIKE_STEP") or "0") or None,
         strikes_around_atm=int(_clean_env("PHASE0_STRIKES_AROUND_ATM") or "15"),
+        gemini_api_key=_clean_env("GEMINI_API_KEY"),
+        anthropic_api_key=_clean_env("ANTHROPIC_API_KEY"),
+        openai_api_key=_clean_env("OPENAI_API_KEY"),
+        groq_api_key=_clean_env("GROQ_API_KEY"),
+        narrative_enabled=(_clean_env("NARRATIVE_ENABLED") or "true").lower() in ("true", "1", "yes"),
+        narrative_provider=_clean_env("NARRATIVE_PROVIDER") or "google-gla",
+        narrative_model=_clean_env("NARRATIVE_MODEL") or "gemma-4-31b-it",
+        narrative_max_tokens=int(_clean_env("NARRATIVE_MAX_TOKENS") or "220"),
+        narrative_timeout_s=int(_clean_env("NARRATIVE_TIMEOUT_S") or "30"),
     )
 
 
